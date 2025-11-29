@@ -20,9 +20,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.duyvv.citizen_card_app.data.repository.JavaCardRepositoryImpl
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.duyvv.citizen_card_app.domain.ApplicationState
 import com.duyvv.citizen_card_app.presentation.dialog.EnterPinDialog
 import com.duyvv.citizen_card_app.presentation.ui.theme.*
+import kotlinx.coroutines.flow.combine
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -34,7 +36,11 @@ import org.koin.compose.viewmodel.koinViewModel
 fun MainScreen() {
     // Material 3 Theme Wrapper (Nên bao bọc app trong này)
     val viewModel = koinViewModel<HomeViewModel>()
-    var showPinDialog by remember { mutableStateOf(false) }
+    val isCardConnected by
+    combine(ApplicationState.isCardVerified, ApplicationState.isCardInserted) { isCardInserted, isCardVerified ->
+        isCardInserted && isCardVerified
+    }.collectAsStateWithLifecycle(false)
+    val uiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
     MaterialTheme(
         colorScheme = lightColorScheme(
             primary = ColorHeaderBg,
@@ -43,22 +49,26 @@ fun MainScreen() {
         )
     ) {
         SystemManagerApp(
+            isCardConnected = isCardConnected,
             onClickConnectCard = {
-                showPinDialog = true
+                if (isCardConnected) {
+                    viewModel.disconnectCard()
+                } else {
+                    viewModel.showPinDialog(true)
+                }
             }
         )
-        val service = JavaCardRepositoryImpl()
-        if (showPinDialog) {
+        if (uiState.isShowPinDialog) {
             EnterPinDialog(
                 label = "Nhập mã pin (6 ký tự)",
                 hint = "Mã pin",
                 leftLabel = "Huỷ",
                 rightLabel = "Xác nhận",
                 onClickLeftBtn = {
-                    showPinDialog = false
+                    viewModel.showPinDialog(false)
                 },
                 onClickRightBtn = { pinCode ->
-                    viewModel.connectCard()
+                    viewModel.connectCard(pinCode)
                 }
             )
         }
@@ -67,12 +77,13 @@ fun MainScreen() {
 
 @Composable
 fun SystemManagerApp(
+    isCardConnected: Boolean,
     onClickConnectCard: () -> Unit = {},
 ) {
     var selectedTabIndex by remember { mutableStateOf(0) }
 
     Scaffold(
-        topBar = { AppHeader(onClickConnectCard) },
+        topBar = { AppHeader(isCardConnected, onClickConnectCard) },
         containerColor = ColorBackground
     ) { paddingValues ->
         Column(
@@ -111,7 +122,7 @@ fun SystemManagerApp(
 
 // --- 1. HEADER COMPONENT ---
 @Composable
-fun AppHeader(onClickConnectCard: () -> Unit) {
+fun AppHeader(isCardConnected: Boolean, onClickConnectCard: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -174,13 +185,19 @@ fun AppHeader(onClickConnectCard: () -> Unit) {
                 onClick = {
                     onClickConnectCard.invoke()
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = ColorOrange),
+                colors = ButtonDefaults.buttonColors(containerColor = if (isCardConnected) ColorOrange else ColorRed),
                 shape = RoundedCornerShape(4.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp)
             ) {
                 Icon(Icons.Default.CreditCard, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Kết nối thẻ", fontWeight = FontWeight.Bold)
+                Text(
+                    if (isCardConnected) {
+                        "Ngắt kết nối thẻ"
+                    } else {
+                        "Kết nối thẻ"
+                    }, fontWeight = FontWeight.Bold
+                )
             }
 
             OutlinedButton(

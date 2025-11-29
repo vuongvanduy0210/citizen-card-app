@@ -38,6 +38,12 @@ kotlin {
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
+
+            implementation("org.jetbrains.exposed:exposed-core:0.56.0")
+            implementation("org.jetbrains.exposed:exposed-dao:0.56.0")
+            implementation("org.jetbrains.exposed:exposed-jdbc:0.56.0")
+            implementation("org.jetbrains.exposed:exposed-kotlin-datetime:0.56.0")
+            implementation("org.xerial:sqlite-jdbc:3.46.1.3")
         }
     }
 }

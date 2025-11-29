@@ -2,19 +2,14 @@ package com.duyvv.citizen_card_app.data.repository
 
 import com.duyvv.citizen_card_app.data.dto.ApduResult
 import com.duyvv.citizen_card_app.domain.ApplicationState
+import com.duyvv.citizen_card_app.domain.repository.JavaCardRepository
+import com.duyvv.citizen_card_app.utils.RSAUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
-import java.util.Random
+import java.util.*
 import javax.smartcardio.CommandAPDU
 import javax.smartcardio.TerminalFactory
-
-interface JavaCardRepository {
-    suspend fun connectCard(): Boolean
-    suspend fun isCardActive(): Boolean
-    suspend fun getCardId(): String?
-    fun disconnectCard()
-}
 
 class JavaCardRepositoryImpl : JavaCardRepository {
 
@@ -161,10 +156,9 @@ class JavaCardRepositoryImpl : JavaCardRepository {
         }
     }
 
-    fun challengeCard(citizenId: String): Boolean {
+    override suspend fun challengeCard(citizenId: String, storedPublicKey: String?): Boolean {
         val challenge = Random().nextInt(1000000).toString()
         println("[DEBUG] Challenge: $challenge")
-        val storedPublicKey = DBController.getPublicKeyById(citizenId)
         println("[DEBUG] Stored public key: $storedPublicKey")
         if (storedPublicKey == null) return false
 
@@ -186,6 +180,37 @@ class JavaCardRepositoryImpl : JavaCardRepository {
                 false
             }
         }
+    }
+
+    override suspend fun verifyCard(pinCode: String, onResult: (Boolean, Int) -> Unit) {
+        println("verifyCard")
+        when (val result = sendApdu(0x00, 0x00, 0x00, 0x00, stringToHexArray(pinCode))) {
+            is ApduResult.Success -> {
+                println("APDU command executed successfully!")
+                println("response: " + bytesToHex(result.response))
+                onResult.invoke(true, 5)
+            }
+            is ApduResult.Failed -> {
+                println("Failed to execute APDU command.")
+                println("response: " + bytesToHex(result.response))
+                onResult.invoke(false, bytesToHex(result.response)?.toInt() ?: 0)
+            }
+        }
+    }
+
+    private fun verifySignature(publicKey: ByteArray?, signature: ByteArray?, challenge: String): Boolean {
+        val key = RSAUtils.generatePublicKeyFromBytes(publicKey) ?: return false
+        return RSAUtils.accuracy(signature, key, challenge)
+    }
+
+    fun parseHexStringToByteArray(hexString: String): ByteArray {
+        return hexString.trim().split(" ")
+            .map { it.toInt(16).toByte() }
+            .toByteArray()
+    }
+
+    fun stringToHexArray(str: String): ByteArray {
+        return str.toByteArray(Charsets.UTF_8)
     }
 
     fun bytesToHex(bytes: ByteArray?): String? {

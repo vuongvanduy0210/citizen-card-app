@@ -2,6 +2,7 @@ package com.duyvv.citizen_card_app.domain
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import javax.smartcardio.Card
 
 object ApplicationState {
@@ -30,5 +31,9 @@ object ApplicationState {
         cardNumber = null
         card?.disconnect(false)
         card = null
+    }
+
+    fun isCardConnected(): Boolean {
+        return isCardInserted.value && isCardVerified.value
     }
 }
