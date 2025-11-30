@@ -15,3 +15,12 @@ val ColorInputBg = Color(0xFFECEFF1)
 val ColorInputBorder = Color(0xFFB0BEC5)
 val ColorBtnCancelBg = Color(0xFFCFD8DC)
 val ColorBtnCancelText = Color(0xFF455A64)
+
+val ColorBgRoot = Color(0xFFF5F5F5)
+val ColorBorderContainer = Color(0xFF333333)
+val ColorBgContainer = Color.White
+val ColorAvatarBorder = Color(0xFF999999)
+val ColorAvatarBg = Color(0xFFEEEEEE)
+val ColorFieldBg = Color(0xFFF9F9F9)
+val ColorFieldBorder = Color(0xFFCCCCCC)
+val ColorLabelText = Color(0xFF333333)

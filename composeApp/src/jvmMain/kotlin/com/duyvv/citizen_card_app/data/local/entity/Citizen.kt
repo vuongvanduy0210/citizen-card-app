@@ -11,7 +11,7 @@ data class Citizen(
     val ethnicity: String,
     val religion: String,
     val identification: String,
-    val avatar: ByteArray? = null
+    var avatar: ByteArray? = null
 ) {
     fun toCardInfo(): String =
         listOf(

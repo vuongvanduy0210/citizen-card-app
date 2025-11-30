@@ -33,7 +33,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 fun CitizenItemPreview() {
     // Giả lập dữ liệu để xem trước 1 dòng
     EnterPinDialog(
-        label = "Enter Pin",
+        label = "Enter Pinassssssssssssssssssssssddddddddddddddsd",
         hint = "ggggg ",
         leftLabel = "Thoát",
         rightLabel = "Xác nhận",
@@ -85,19 +85,20 @@ fun EnterPinDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "Nhập mã PIN",
+                        text = label,
                         color = ColorTextPrimary,
                         fontSize = 22.sp,
+                        textAlign = TextAlign.Center,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.SansSerif
+                        fontFamily = FontFamily.SansSerif,
+                        modifier = Modifier.fillMaxWidth()
                     )
-
-                    Text(
+                    /*Text(
                         text = label,
                         color = ColorTextSecondary,
                         fontSize = 14.sp,
                         fontFamily = FontFamily.SansSerif
-                    )
+                    )*/
                 }
 
                 // --- Password Field ---

@@ -1,12 +1,14 @@
 package com.duyvv.citizen_card_app.data.repository
 
 import com.duyvv.citizen_card_app.data.dto.ApduResult
+import com.duyvv.citizen_card_app.data.local.entity.Citizen
 import com.duyvv.citizen_card_app.domain.ApplicationState
 import com.duyvv.citizen_card_app.domain.repository.JavaCardRepository
 import com.duyvv.citizen_card_app.utils.RSAUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
+import java.text.SimpleDateFormat
 import java.util.*
 import javax.smartcardio.CommandAPDU
 import javax.smartcardio.TerminalFactory
@@ -156,44 +158,136 @@ class JavaCardRepositoryImpl : JavaCardRepository {
         }
     }
 
-    override suspend fun challengeCard(citizenId: String, storedPublicKey: String?): Boolean {
-        val challenge = Random().nextInt(1000000).toString()
-        println("[DEBUG] Challenge: $challenge")
-        println("[DEBUG] Stored public key: $storedPublicKey")
-        if (storedPublicKey == null) return false
+    override suspend fun challengeCard(citizenId: String, storedPublicKey: String?): Boolean =
+        withContext(Dispatchers.IO) {
+            val challenge = Random().nextInt(1000000).toString()
+            println("[DEBUG] Challenge: $challenge")
+            println("[DEBUG] Stored public key: $storedPublicKey")
+            if (storedPublicKey == null) return@withContext false
 
-        val publicKey = parseHexStringToByteArray(storedPublicKey)
-        println("[DEBUG] Public key: " + bytesToHex(publicKey))
+            val publicKey = parseHexStringToByteArray(storedPublicKey)
+            println("[DEBUG] Public key: " + bytesToHex(publicKey))
 
-        return when (val result = sendApdu(0x00, 0x01, 0x06, 0x00, stringToHexArray(challenge))) {
-            is ApduResult.Success -> {
-                println("APDU command executed successfully!")
-                println("response: " + bytesToHex(result.response))
-                println("[DEBUG] Signature Sucess: " + bytesToHex(result.response))
-                verifySignature(publicKey, result.response, challenge)
-            }
+            when (val result = sendApdu(0x00, 0x01, 0x06, 0x00, stringToHexArray(challenge))) {
+                is ApduResult.Success -> {
+                    println("APDU command executed successfully!")
+                    println("response: " + bytesToHex(result.response))
+                    println("[DEBUG] Signature Sucess: " + bytesToHex(result.response))
+                    verifySignature(publicKey, result.response, challenge)
+                }
 
-            is ApduResult.Failed -> {
-                println("Failed to execute APDU command.")
-                val error = bytesToHex(result.response)
-                println("[DEBUG] Signature Failed: $error")
-                false
+                is ApduResult.Failed -> {
+                    println("Failed to execute APDU command.")
+                    val error = bytesToHex(result.response)
+                    println("[DEBUG] Signature Failed: $error")
+                    false
+                }
             }
         }
-    }
 
-    override suspend fun verifyCard(pinCode: String, onResult: (Boolean, Int) -> Unit) {
+    override suspend fun verifyCard(pinCode: String): Pair<Boolean, Int> = withContext(Dispatchers.IO) {
         println("verifyCard")
         when (val result = sendApdu(0x00, 0x00, 0x00, 0x00, stringToHexArray(pinCode))) {
             is ApduResult.Success -> {
                 println("APDU command executed successfully!")
                 println("response: " + bytesToHex(result.response))
-                onResult.invoke(true, 5)
+                true to 5
             }
+
             is ApduResult.Failed -> {
                 println("Failed to execute APDU command.")
                 println("response: " + bytesToHex(result.response))
-                onResult.invoke(false, bytesToHex(result.response)?.toInt() ?: 0)
+                false to (bytesToHex(result.response)?.toInt() ?: 0)
+            }
+        }
+    }
+
+    override suspend fun getCardInfo(): Citizen? = withContext(Dispatchers.IO) {
+        println("getCardInfo")
+        when (val result = sendApdu(0x00, 0x02, 0x05, 0x07, null)) {
+            is ApduResult.Success -> {
+                println("APDU command executed successfully!")
+                println("=====>Card Response Data L1: ${bytesToHex(result.response)}")
+                println("=====>Card Response Data: ${hexToString(bytesToHex(result.response))}")
+                val citizen = Citizen.fromCardInfo(hexToStringUnicode(bytesToHex(result.response)))
+                citizen.avatar = getAvatar()
+                citizen
+            }
+
+            is ApduResult.Failed -> {
+                println("Get Card info fail.")
+                null
+            }
+        }
+    }
+
+    override suspend fun setupPinCode(
+        pinCode: String,
+        citizen: Citizen,
+        latestId: String?,
+        onResult: (Boolean, Citizen?, String?) -> Unit
+    ) = withContext(Dispatchers.IO) {
+        val citizen = citizen.copy(citizenId = generateId(latestId))
+        println("setupPinCode=====>" + bytesToHex(stringToHexArray(citizen.toCardInfo() + "$" + pinCode)))
+        val formattedDate = SimpleDateFormat("dd/MM/yyyy").format(Date())
+        val data = stringToHexArray("${citizen.toCardInfo()}$${formattedDate}$${pinCode}")
+        when (val result = sendApdu(0x00, 0x01, 0x05, 0x00, data)) {
+            is ApduResult.Success -> {
+                ApplicationState.setCardInserted(true)
+                ApplicationState.setCardVerified(true)
+                val publicKey = bytesToHex(result.response)
+                println("setupPinCode=====>publicKey: $publicKey")
+                citizen.avatar?.let {
+                    sendAvatar(it)
+                }
+                onResult(true, citizen, publicKey)
+            }
+
+            is ApduResult.Failed -> {
+                println("setupPinCode=====>failed")
+                onResult(false, null, null)
+            }
+        }
+    }
+
+    override suspend fun sendAvatar(avatar: ByteArray?): Boolean {
+        return when (sendApdu(0x00, 0x03, 0x05, 0x09, avatar)) {
+            is ApduResult.Success -> {
+                println("sendAvatar success")
+                true
+            }
+
+            is ApduResult.Failed -> {
+                println("sendAvatar failed")
+                false
+            }
+        }
+    }
+
+    private fun generateId(latestId: String?): String {
+        val prefix = SimpleDateFormat("ddMMyy").format(Date())
+        val subFix = if (latestId == null) {
+            "000001"
+        } else if (latestId.length >= 6) {
+            val last6Chars = latestId.substring(latestId.length - 6)
+            val last6Int = last6Chars.toInt()
+            return String.format("%06d", last6Int + 1)
+        } else {
+            "000001"
+        }
+        return prefix + subFix
+    }
+
+    private suspend fun getAvatar(): ByteArray? = withContext(Dispatchers.IO) {
+        when (val result = sendApdu(0x00, 0x02, 0x05, 0x09, null)) {
+            is ApduResult.Success -> {
+                println("Get avatar success: " + bytesToHex(result.response))
+                result.response
+            }
+
+            is ApduResult.Failed -> {
+                println("Get avatar fail: " + bytesToHex(result.response))
+                null
             }
         }
     }
@@ -229,5 +323,17 @@ class JavaCardRepositoryImpl : JavaCardRepository {
         return hex.chunked(2)
             .map { it.toInt(16).toChar() }
             .joinToString("")
+    }
+
+    fun hexToStringUnicode(hexInput: String?): String {
+        val hex = hexInput?.replace(" ", "")
+        if (hex.isNullOrEmpty()) {
+            return ""
+        }
+        require(hex.length % 2 == 0) { "Invalid hex string length" }
+        val byteArray = hex.chunked(2)              // Cắt thành từng cặp ký tự: ["E1", "BB", "AF"]
+            .map { it.toInt(16).toByte() }          // Chuyển từng cặp thành Byte
+            .toByteArray()                          // Gom lại thành mảng ByteArray
+        return String(byteArray, Charsets.UTF_8)
     }
 }

@@ -1,8 +1,10 @@
 package com.duyvv.citizen_card_app.presentation.home
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.*
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,33 +16,40 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.duyvv.citizen_card_app.data.local.entity.Citizen
 import com.duyvv.citizen_card_app.domain.ApplicationState
+import com.duyvv.citizen_card_app.presentation.dialog.ChangePinDialog
+import com.duyvv.citizen_card_app.presentation.dialog.EditInfoDialog
 import com.duyvv.citizen_card_app.presentation.dialog.EnterPinDialog
+import com.duyvv.citizen_card_app.presentation.dialog.NoticeDialog
 import com.duyvv.citizen_card_app.presentation.ui.theme.*
 import kotlinx.coroutines.flow.combine
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.jetbrains.skia.Image
 import org.koin.compose.viewmodel.koinViewModel
-
-//import org.koin.compose.viewmodel.koinViewModel
 
 
 @Composable
 @Preview
 fun MainScreen() {
-    // Material 3 Theme Wrapper (Nên bao bọc app trong này)
+    // Material 3 Theme Wrapper
     val viewModel = koinViewModel<HomeViewModel>()
     val isCardConnected by
     combine(ApplicationState.isCardVerified, ApplicationState.isCardInserted) { isCardInserted, isCardVerified ->
         isCardInserted && isCardVerified
     }.collectAsStateWithLifecycle(false)
     val uiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
+
     MaterialTheme(
         colorScheme = lightColorScheme(
             primary = ColorHeaderBg,
@@ -48,37 +57,182 @@ fun MainScreen() {
             surface = Color.White
         )
     ) {
-        SystemManagerApp(
-            isCardConnected = isCardConnected,
-            onClickConnectCard = {
-                if (isCardConnected) {
-                    viewModel.disconnectCard()
-                } else {
-                    viewModel.showPinDialog(true)
-                }
-            }
-        )
-        if (uiState.isShowPinDialog) {
-            EnterPinDialog(
-                label = "Nhập mã pin (6 ký tự)",
-                hint = "Mã pin",
-                leftLabel = "Huỷ",
-                rightLabel = "Xác nhận",
-                onClickLeftBtn = {
-                    viewModel.showPinDialog(false)
+        // Dùng Box để xếp chồng các lớp (App chính ở dưới, Dialog animation ở trên)
+        Box(modifier = Modifier.fillMaxSize()) {
+            SystemManagerApp(
+                citizen = uiState.cardInfo,
+                isCardConnected = isCardConnected,
+                onClickConnectCard = {
+                    if (isCardConnected) {
+                        viewModel.disconnectCard()
+                    } else {
+                        viewModel.showPinDialog(true)
+                    }
                 },
-                onClickRightBtn = { pinCode ->
-                    viewModel.connectCard(pinCode)
+                onClickCreateInfo = {
+                    viewModel.showEditInfoDialog(true)
                 }
             )
+
+            // --- 0. SCRIM (Lớp phủ mờ nền) ---
+            // Hiển thị khi bất kỳ dialog nào đang mở
+            val isAnyDialogVisible = uiState.isShowPinDialog ||
+                    uiState.isShowErrorPinCodeDialog ||
+                    uiState.isShowNoticeDialog ||
+                    uiState.isShowEditInfoDialog
+
+            AnimatedVisibility(
+                visible = isAnyDialogVisible,
+                enter = fadeIn(tween(300)),
+                exit = fadeOut(tween(300))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.4f)) // Màu đen mờ 40%
+                        // Chặn click xuống màn hình dưới
+                        .clickable(enabled = false) {}
+                )
+            }
+
+            // --- 1. PIN Dialog Animation (Spring Pop-up) ---
+            // Hiệu ứng nảy (Bouncy) khi hiện ra
+            AnimatedVisibility(
+                visible = uiState.isShowPinDialog,
+                enter = fadeIn(tween(200)) + scaleIn(
+                    initialScale = 0.8f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                ),
+                exit = fadeOut(tween(0)) + scaleOut(targetScale = 0.9f)
+            ) {
+                // Để Dialog hiển thị chính giữa màn hình (nếu không dùng Window Dialog)
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    EnterPinDialog(
+                        label = "Nhập mã pin (6 ký tự)",
+                        hint = "Mã pin",
+                        leftLabel = "Huỷ",
+                        rightLabel = "Xác nhận",
+                        onClickLeftBtn = {
+                            viewModel.showPinDialog(false)
+                        },
+                        onClickRightBtn = { pinCode ->
+                            viewModel.connectCard(pinCode)
+                        }
+                    )
+                }
+            }
+
+            // --- 2. Error PIN Dialog Animation ---
+            AnimatedVisibility(
+                visible = uiState.isShowErrorPinCodeDialog,
+                enter = fadeIn(tween(200)) + scaleIn(
+                    initialScale = 0.8f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)
+                ),
+                exit = fadeOut(tween(0)) + scaleOut(targetScale = 0.95f)
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    EnterPinDialog(
+                        label = "Bạn đã nhập sai mã PIN, vui lòng thử lại",
+                        hint = "Mã pin",
+                        leftLabel = "Huỷ",
+                        rightLabel = "Xác nhận",
+                        onClickLeftBtn = {
+                            viewModel.showErrorPinCodeDialog(false)
+                        },
+                        onClickRightBtn = { pinCode ->
+                            viewModel.verifyPinCard(pinCode)
+                        }
+                    )
+                }
+            }
+
+            // --- 3. Notice Dialog Animation ---
+            AnimatedVisibility(
+                visible = uiState.isShowNoticeDialog,
+                enter = fadeIn(tween(200)) + slideInVertically(
+                    initialOffsetY = { -40 }, // Trượt nhẹ từ trên xuống
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                ),
+                exit = fadeOut(tween(150))
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    NoticeDialog(
+                        message = uiState.noticeMessage,
+                        textButton = "OK"
+                    ) {
+                        viewModel.showNoticeDialog(false)
+                    }
+                }
+            }
+
+            // --- 4. Edit Info Dialog Animation (Slide Up + Expand) ---
+            AnimatedVisibility(
+                visible = uiState.isShowEditInfoDialog,
+                enter = fadeIn(tween(300)) + slideInVertically(
+                    initialOffsetY = { it }, // Trượt từ đáy màn hình lên
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                ),
+                exit = fadeOut(tween(200)) + slideOutVertically(
+                    targetOffsetY = { it }, // Trượt xuống đáy
+                    animationSpec = tween(200)
+                )
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    EditInfoDialog(
+                        citizen = uiState.cardInfo,
+                        onDismiss = { viewModel.showEditInfoDialog(false) },
+                        onSave = { citizen ->
+                            viewModel.createCitizen = citizen
+                            viewModel.showSetupPinDialog(true)
+                            viewModel.showEditInfoDialog(false)
+                        }
+                    )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = uiState.isShowSetupPinDialog,
+                enter = fadeIn(tween(300)) + slideInVertically(
+                    initialOffsetY = { it }, // Trượt từ đáy màn hình lên
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                ),
+                exit = fadeOut(tween(200)) + slideOutVertically(
+                    targetOffsetY = { it },
+                    animationSpec = tween(200)
+                )
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    ChangePinDialog(
+                        isChangePin = false,
+                        onDismiss = {
+                            viewModel.showSetupPinDialog(false)
+                        },
+                        onConfirm = { _, newPin ->
+                            viewModel.createCitizen?.let { viewModel.setupPinCode(newPin, it) }
+                        }
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
 fun SystemManagerApp(
+    citizen: Citizen?,
     isCardConnected: Boolean,
     onClickConnectCard: () -> Unit = {},
+    onClickCreateInfo: () -> Unit
 ) {
     var selectedTabIndex by remember { mutableStateOf(0) }
 
@@ -112,7 +266,7 @@ fun SystemManagerApp(
             // --- TAB CONTENT ---
             Box(modifier = Modifier.fillMaxSize()) {
                 when (selectedTabIndex) {
-                    0 -> HomeTabContent()
+                    0 -> HomeTabContent(isCardConnected, citizen, onClickCreateInfo)
                     1 -> ManageCitizenTabContent()
                 }
             }
@@ -218,40 +372,98 @@ fun AppHeader(isCardConnected: Boolean, onClickConnectCard: () -> Unit) {
     }
 }
 
-// --- 2. HOME TAB ---
 @Composable
-fun HomeTabContent() {
+fun HomeTabContent(isCardConnected: Boolean, citizen: Citizen?, onClickCreateInfo: () -> Unit) {
+    if (isCardConnected) {
+        if (citizen == null) {
+            EmptyCardScreen(onClickCreateInfo)
+        } else {
+            CitizenInfoScreen(citizen)
+        }
+    } else {
+        Box(
+            modifier = Modifier.fillMaxSize().background(Color.White),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                // Placeholder Image (Dùng Icon lớn thay cho ảnh)
+                Icon(
+                    imageVector = Icons.Default.CreditCard,
+                    contentDescription = "Insert Card",
+                    modifier = Modifier.size(180.dp),
+                    tint = ColorTextSecondary.copy(alpha = 0.5f)
+                )
+
+                Text(
+                    text = "HỆ THỐNG QUẢN LÝ THẺ CÔNG DÂN",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = ColorTextPrimary
+                    )
+                )
+
+                Text(
+                    text = "Vui lòng kết nối thẻ để tiếp tục thao tác",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        color = ColorTextSecondary
+                    )
+                )
+            }
+        }
+    }
+}
+
+
+@Composable
+fun AvatarDisplay(avatarBytes: ByteArray?) {
     Box(
-        modifier = Modifier.fillMaxSize().background(Color.White),
+        modifier = Modifier
+            .size(120.dp) // fitHeight="100.0" fitWidth="100.0" (Tăng nhẹ lên 120 cho đẹp)
+            .background(ColorAvatarBg, RoundedCornerShape(5.dp))
+            .border(2.dp, ColorAvatarBorder, RoundedCornerShape(5.dp))
+            .clip(RoundedCornerShape(5.dp)),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            // Placeholder Image (Dùng Icon lớn thay cho ảnh)
-            Icon(
-                imageVector = Icons.Default.CreditCard,
-                contentDescription = "Insert Card",
-                modifier = Modifier.size(180.dp),
-                tint = ColorTextSecondary.copy(alpha = 0.5f)
-            )
-
-            Text(
-                text = "HỆ THỐNG QUẢN LÝ THẺ CÔNG DÂN",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = ColorTextPrimary
+        if (avatarBytes != null && avatarBytes.isNotEmpty()) {
+            val bitmap = remember(avatarBytes) {
+                try {
+                    Image.makeFromEncoded(avatarBytes).toComposeImageBitmap()
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = "Avatar",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
                 )
-            )
-
-            Text(
-                text = "Vui lòng kết nối thẻ để tiếp tục thao tác",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    color = ColorTextSecondary
-                )
-            )
+            } else {
+                Icon(Icons.Default.AccountBox, null, tint = Color.Gray, modifier = Modifier.size(60.dp))
+            }
+        } else {
+            Icon(Icons.Default.AccountBox, null, tint = Color.Gray, modifier = Modifier.size(60.dp))
         }
+    }
+}
+
+@Composable
+fun ActionButton(text: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFFE0E0E0), // Màu xám nhẹ cho nút
+            contentColor = Color.Black
+        ),
+        shape = RoundedCornerShape(4.dp),
+        // border = BorderStroke(1.dp, Color.Gray), // Nếu muốn viền như nút cũ
+        modifier = Modifier.height(40.dp)
+    ) {
+        Text(text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -370,6 +582,7 @@ fun TabItem(selected: Boolean, onClick: () -> Unit, text: String) {
         text = {
             Text(
                 text = text,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (selected) ColorHeaderBg else Color.Gray
             )

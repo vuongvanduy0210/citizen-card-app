@@ -21,7 +21,6 @@ object CitizenDao {
             it[religion] = c.religion
             it[identification] = c.identification
             it[avatar] = c.avatar?.let { bytes -> ExposedBlob(bytes) }
-            // Không insert publicKey ở đây nếu logic của bạn là update sau
         }
     }
 
@@ -37,7 +36,7 @@ object CitizenDao {
             it[religion] = c.religion
             it[identification] = c.identification
             if (c.avatar != null) {
-                it[avatar] = ExposedBlob(c.avatar)
+                it[avatar] = ExposedBlob(c.avatar!!)
             }
         }
     }

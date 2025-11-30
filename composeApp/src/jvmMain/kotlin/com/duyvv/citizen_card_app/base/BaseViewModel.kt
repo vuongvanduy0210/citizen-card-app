@@ -24,13 +24,6 @@ open class BaseViewModel<UiStateType : UiState>(
         _uiStateFlow.update(function)
     }
 
-    private val _event = MutableSharedFlow<Any>(replay = 1)
-    val event = _event.asSharedFlow()
-
-    protected fun sendEvent(event: Any) {
-        _event.tryEmit(event)
-    }
-
     private fun handleException(throwable: Throwable) {
         println("ViewModelException: ${throwable.message}")
     }

@@ -1,8 +1,8 @@
 package com.duyvv.citizen_card_app.presentation.home
 
-import androidx.lifecycle.viewModelScope
 import com.duyvv.citizen_card_app.base.BaseViewModel
 import com.duyvv.citizen_card_app.base.UiState
+import com.duyvv.citizen_card_app.data.local.entity.Citizen
 import com.duyvv.citizen_card_app.domain.ApplicationState
 import com.duyvv.citizen_card_app.domain.repository.DataRepository
 import com.duyvv.citizen_card_app.domain.repository.JavaCardRepository
@@ -13,8 +13,10 @@ class HomeViewModel(
     private val dataRepository: DataRepository,
 ) : BaseViewModel<HomeUIState>(HomeUIState()) {
 
+    var createCitizen: Citizen? = null
+
     fun connectCard(pinCode: String) {
-        viewModelScope.launch {
+        viewModelHandlerScope.launch {
             val isConnected = cardRepository.connectCard()
             if (isConnected) {
                 if (cardRepository.isCardActive()) {
@@ -27,43 +29,174 @@ class HomeViewModel(
                         )
                         println("Challenge result : $isCardVerified")
                         if (!isCardVerified) {
-                            sendEvent("Thẻ không hợp lệ do sai định dạng!")
+                            updateUiState {
+                                it.copy(
+                                    isShowNoticeDialog = true,
+                                    noticeMessage = "Thẻ không hợp lệ do sai định dạng!"
+                                )
+                            }
                             ApplicationState.setCardVerified(false)
                             return@launch
                         }
                     }
-                    cardRepository.verifyCard(pinCode) { isVerified, pinAttemptsRemain ->
-                        ApplicationState.setCardVerified(isVerified)
-                        if (isVerified) {
-                            updateUiState { it.copy(isShowPinDialog = false) }
-                        } else {
-                            println("Pin code is incorrect!: $pinAttemptsRemain")
-                            if (pinAttemptsRemain > 0) {
-
-                            }
+                    val (isVerified, pinAttemptsRemain) = cardRepository.verifyCard(pinCode)
+                    ApplicationState.setCardVerified(isVerified)
+                    if (isVerified) {
+                        updateUiState {
+                            it.copy(
+                                isShowNoticeDialog = false,
+                                isShowErrorPinCodeDialog = false,
+                                isShowPinDialog = false
+                            )
+                        }
+                        getCardInfo()
+                    } else {
+                        println("Pin code is incorrect!: $pinAttemptsRemain")
+                        if (pinAttemptsRemain > 0) {
+                            updateUiState { it.copy(isShowPinDialog = false, isShowErrorPinCodeDialog = true) }
                         }
                     }
                 } else {
-                    sendEvent("Thẻ đã bị khoá!")
+                    updateUiState { it.copy(isShowNoticeDialog = true, noticeMessage = "Thẻ đã bị khoá!") }
                     ApplicationState.setCardInserted(false)
                     cardRepository.disconnectCard()
                 }
             } else {
-                sendEvent("Không thể kết nối thẻ!")
+                updateUiState { it.copy(isShowNoticeDialog = true, noticeMessage = "Không thể kết nối thẻ!") }
             }
         }
     }
 
     fun disconnectCard() {
         ApplicationState.reset()
+        updateUiState { it.reset() }
+    }
+
+    fun verifyPinCard(pinCode: String) {
+        viewModelHandlerScope.launch {
+            val (isCardVerified, pinAttemptsRemain) = cardRepository.verifyCard(pinCode)
+            if (isCardVerified) {
+                println("Card connected successfully!")
+                ApplicationState.setCardVerified(true)
+                updateUiState {
+                    it.copy(
+                        isShowNoticeDialog = false,
+                        isShowErrorPinCodeDialog = false,
+                        isShowPinDialog = false
+                    )
+                }
+                getCardInfo()
+            } else {
+                if (pinAttemptsRemain > 0) {
+                    updateUiState {
+                        it.copy(
+                            isShowNoticeDialog = true,
+                            noticeMessage = "Nhập sai mã pin! Còn $pinAttemptsRemain lần thử!"
+                        )
+                    }
+                } else {
+                    updateUiState {
+                        it.copy(
+                            isShowNoticeDialog = true,
+                            noticeMessage = "Thẻ đã bị khoá do quá số lần sai cho phép!"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    suspend fun getCardInfo() {
+        val cardInfo = cardRepository.getCardInfo()
+        if (cardInfo == null) {
+            updateUiState { it.copy(isShowEditInfoDialog = true, cardInfo = null) }
+        } else {
+            updateUiState { it.copy(cardInfo = cardInfo) }
+        }
+    }
+
+    fun setupPinCode(pinCode: String, citizen: Citizen) {
+        viewModelHandlerScope.launch {
+            println("setupPinCode11111: ")
+            val latestId = dataRepository.getLatestCitizenId()
+            println("setupPinCode: $latestId")
+            cardRepository.setupPinCode(pinCode, citizen, latestId) { isSuccess, newCitizen, publicKey ->
+                if (isSuccess && newCitizen != null && publicKey != null) {
+                    updateCitizenLocal(newCitizen, publicKey)
+                } else {
+                    updateUiState {
+                        it.copy(
+                            isShowNoticeDialog = true,
+                            noticeMessage = "Thiết lập mã PIN thất bại, vui lòng thử lại!"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun updateCitizenLocal(citizen: Citizen, publicKey: String) {
+        viewModelHandlerScope.launch {
+            val isInsertSuccess = dataRepository.insertCitizen(citizen)
+            val isSetPublicKeySuccess = dataRepository.updatePublicKey(citizen.citizenId, publicKey)
+            if (isInsertSuccess && isSetPublicKeySuccess) {
+                updateUiState {
+                    it.copy(
+                        isShowNoticeDialog = true,
+                        isShowSetupPinDialog = false,
+                        noticeMessage = "Thiết lập mã PIN thành công!"
+                    )
+                }
+                getCardInfo()
+            } else {
+                updateUiState {
+                    it.copy(
+                        isShowNoticeDialog = true,
+                        noticeMessage = "Thiết lập mã PIN thất bại, vui lòng thử lại!"
+                    )
+                }
+            }
+        }
     }
 
     fun showPinDialog(isShow: Boolean) {
         updateUiState { it.copy(isShowPinDialog = isShow) }
     }
+
+    fun showErrorPinCodeDialog(isShow: Boolean) {
+        updateUiState { it.copy(isShowErrorPinCodeDialog = isShow) }
+    }
+
+    fun showNoticeDialog(isShow: Boolean) {
+        updateUiState { it.copy(isShowNoticeDialog = isShow) }
+    }
+
+    fun showEditInfoDialog(isShow: Boolean) {
+        updateUiState { it.copy(isShowEditInfoDialog = isShow) }
+    }
+
+    fun showSetupPinDialog(isShow: Boolean) {
+        updateUiState { it.copy(isShowSetupPinDialog = isShow) }
+    }
 }
 
 data class HomeUIState(
     val isShowPinDialog: Boolean = false,
-    val errorMessage: String = "",
-) : UiState
+    val isShowErrorPinCodeDialog: Boolean = false,
+    val isShowNoticeDialog: Boolean = false,
+    val noticeMessage: String = "",
+    val isShowEditInfoDialog: Boolean = false,
+    val isShowSetupPinDialog: Boolean = false,
+    val cardInfo: Citizen? = null,
+    val errorMessage: String = ""
+) : UiState {
+    fun reset() = copy(
+        isShowPinDialog = false,
+        isShowErrorPinCodeDialog = false,
+        isShowNoticeDialog = false,
+        noticeMessage = "",
+        isShowEditInfoDialog = false,
+        cardInfo = null,
+        errorMessage = ""
+    )
+}
