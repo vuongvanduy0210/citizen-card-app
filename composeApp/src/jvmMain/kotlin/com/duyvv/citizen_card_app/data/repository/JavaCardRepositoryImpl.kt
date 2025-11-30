@@ -227,7 +227,9 @@ class JavaCardRepositoryImpl : JavaCardRepository {
         latestId: String?,
         onResult: (Boolean, Citizen?, String?) -> Unit
     ) = withContext(Dispatchers.IO) {
-        val citizen = citizen.copy(citizenId = generateId(latestId))
+        val newId = generateId(latestId)
+        println("newid: $newId, latestId: $latestId")
+        val citizen = citizen.copy(citizenId = newId)
         println("setupPinCode=====>" + bytesToHex(stringToHexArray(citizen.toCardInfo() + "$" + pinCode)))
         val formattedDate = SimpleDateFormat("dd/MM/yyyy").format(Date())
         val data = stringToHexArray("${citizen.toCardInfo()}$${formattedDate}$${pinCode}")
@@ -271,11 +273,12 @@ class JavaCardRepositoryImpl : JavaCardRepository {
         } else if (latestId.length >= 6) {
             val last6Chars = latestId.substring(latestId.length - 6)
             val last6Int = last6Chars.toInt()
-            return String.format("%06d", last6Int + 1)
+            String.format("%06d", last6Int + 1)
         } else {
             "000001"
         }
-        return prefix + subFix
+        println("generateId: $prefix")
+        return "$prefix$subFix"
     }
 
     private suspend fun getAvatar(): ByteArray? = withContext(Dispatchers.IO) {

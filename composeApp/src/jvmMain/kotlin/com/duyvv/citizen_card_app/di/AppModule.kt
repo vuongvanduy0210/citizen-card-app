@@ -5,6 +5,7 @@ import com.duyvv.citizen_card_app.data.repository.JavaCardRepositoryImpl
 import com.duyvv.citizen_card_app.domain.repository.DataRepository
 import com.duyvv.citizen_card_app.domain.repository.JavaCardRepository
 import com.duyvv.citizen_card_app.presentation.home.HomeViewModel
+import com.duyvv.citizen_card_app.presentation.home.ManageCitizenViewModel
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.bind
@@ -17,6 +18,7 @@ val dataModule = module {
 
 val viewModelModule = module {
     viewModel { HomeViewModel(get(), get()) }
+    viewModel { ManageCitizenViewModel(get()) }
 }
 
 val appModule = listOf(
