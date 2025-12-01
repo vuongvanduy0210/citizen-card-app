@@ -42,9 +42,9 @@ fun NoticeDialog(message: String, textButton: String, onClickButton: () -> Unit)
     ) {
         Card(
             modifier = Modifier
-                .width(380.dp)
-                .height(200.dp)
-                .padding(20.dp)
+                .width(400.dp)
+                .height(230.dp)
+                .padding(all = 20.dp)
                 .shadow(elevation = 8.dp, shape = RoundedCornerShape(10.dp)),
             shape = RoundedCornerShape(10.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),

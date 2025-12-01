@@ -21,7 +21,7 @@ interface DataRepository {
     suspend fun getPublicKeyById(citizenId: String): String?
     suspend fun updatePublicKey(citizenId: String, publicKey: String): Boolean
     suspend fun isCitizenIdExists(citizenId: String): Boolean
-    suspend fun getLatestCitizenId(): String?
+    suspend fun getLatestCitizenId(prefix: String): String?
 
     // --- Driving License ---
     suspend fun getDrivingLicenseByCitizenId(citizenId: String): List<DrivingLicense>

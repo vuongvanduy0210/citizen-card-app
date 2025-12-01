@@ -18,4 +18,6 @@ interface JavaCardRepository {
 
     suspend fun sendAvatar(avatar: ByteArray?): Boolean
     fun disconnectCard()
+    suspend fun changePin(oldPin: String, newPin: String): Boolean
+    suspend fun updateCardInfo(citizen: Citizen): Boolean
 }

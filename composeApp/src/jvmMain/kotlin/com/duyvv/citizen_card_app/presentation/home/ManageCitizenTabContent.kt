@@ -24,13 +24,42 @@ import com.duyvv.citizen_card_app.presentation.ui.theme.ColorOrange
 import com.duyvv.citizen_card_app.presentation.ui.theme.ColorRed
 import com.duyvv.citizen_card_app.presentation.ui.theme.ColorTextPrimary
 import org.koin.compose.koinInject
+import java.text.SimpleDateFormat
+import java.util.*
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ManageCitizenTabContent() {
     val viewModel = koinInject<ManageCitizenViewModel>()
-
     val uiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState()
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val formattedDate = convertMillisToDate(millis)
+                        viewModel.updateFilterDob(formattedDate)
+                    }
+                    showDatePicker = false
+                }) {
+                    Text("Chọn", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Hủy")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         ElevatedCard(
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -74,15 +103,20 @@ fun ManageCitizenTabContent() {
                         placeholder = "Quê quán", width = 180.dp, icon = Icons.Default.Home
                     )
 
+                    // --- 3. Update Date Field ---
                     M3TextField(
                         value = uiState.filterDob,
                         onValueChange = { viewModel.updateFilterDob(it) },
-                        placeholder = "Ngày sinh", width = 160.dp, icon = Icons.Default.DateRange
+                        placeholder = "Ngày sinh",
+                        width = 160.dp,
+                        icon = Icons.Default.DateRange,
+                        readOnly = true, // Không cho nhập tay để tránh sai định dạng
+                        onIconClick = { showDatePicker = true } // Bấm icon để mở lịch
                     )
 
                     // Action Buttons
                     Button(
-                        onClick = { viewModel.searchCitizens() }, // Gọi lệnh tìm kiếm
+                        onClick = { viewModel.searchCitizens() },
                         colors = ButtonDefaults.buttonColors(containerColor = ColorHeaderBg),
                         shape = RoundedCornerShape(4.dp)
                     ) {
@@ -92,7 +126,7 @@ fun ManageCitizenTabContent() {
                     }
 
                     FilledTonalButton(
-                        onClick = { viewModel.clearFilters() }, // Gọi lệnh làm mới
+                        onClick = { viewModel.clearFilters() },
                         colors = ButtonDefaults.filledTonalButtonColors(
                             containerColor = Color(0xFFCFD8DC), contentColor = ColorTextPrimary
                         ),
@@ -113,7 +147,7 @@ fun ManageCitizenTabContent() {
             modifier = Modifier.weight(1f).fillMaxWidth()
         ) {
             Column {
-                // Table Header (Giữ nguyên)
+                // Table Header
                 Row(
                     modifier = Modifier.fillMaxWidth().background(Color(0xFFEEEEEE))
                         .padding(vertical = 12.dp, horizontal = 8.dp),
@@ -129,7 +163,7 @@ fun ManageCitizenTabContent() {
 
                 HorizontalDivider()
 
-                // Table Content (LazyColumn với dữ liệu thật)
+                // Table Content
                 LazyColumn {
                     items(uiState.citizens) { citizen ->
                         TableRowItem(
@@ -154,14 +188,24 @@ fun M3TextField(
     placeholder: String,
     width: androidx.compose.ui.unit.Dp,
     icon: ImageVector? = null,
-    readOnly: Boolean = false
+    readOnly: Boolean = false,
+    onIconClick: (() -> Unit)? = null // Thêm callback click icon
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         placeholder = { Text(placeholder, style = MaterialTheme.typography.bodySmall) },
         leadingIcon = if (icon != null) {
-            { Icon(icon, contentDescription = null, tint = Color.Gray) }
+            {
+                // Nếu có onIconClick thì dùng IconButton, ngược lại dùng Icon thường
+                if (onIconClick != null) {
+                    IconButton(onClick = onIconClick) {
+                        Icon(icon, contentDescription = null, tint = Color.Gray)
+                    }
+                } else {
+                    Icon(icon, contentDescription = null, tint = Color.Gray)
+                }
+            }
         } else null,
         modifier = Modifier.width(width).height(50.dp),
         singleLine = true,
@@ -232,10 +276,10 @@ fun TableRowItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         TableTextCell(citizen.citizenId, 1.2f)
-        TableTextCell(citizen.fullName ?: "", 2f, alignLeft = true)
-        TableTextCell(citizen.birthDate ?: "", 1.3f)
-        TableTextCell(citizen.gender ?: "", 1f)
-        TableTextCell(citizen.hometown ?: "", 2f, alignLeft = true)
+        TableTextCell(citizen.fullName, 2f, alignLeft = true)
+        TableTextCell(citizen.birthDate, 1.3f)
+        TableTextCell(citizen.gender, 1f)
+        TableTextCell(citizen.hometown, 2f, alignLeft = true)
 
         // Actions Column
         Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
@@ -270,13 +314,11 @@ fun TableRowItem(
 }
 
 @Composable
-
 fun RowScope.TableTextCell(
     text: String,
     weight: Float,
     isHeader: Boolean = false,
     alignLeft: Boolean = false
-
 ) {
     Text(
         text = text,
@@ -288,4 +330,10 @@ fun RowScope.TableTextCell(
             .padding(horizontal = 4.dp),
         textAlign = if (alignLeft) TextAlign.Start else TextAlign.Center
     )
+}
+
+// Hàm tiện ích chuyển đổi ngày
+private fun convertMillisToDate(millis: Long): String {
+    val formatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    return formatter.format(Date(millis))
 }

@@ -7,13 +7,15 @@ import com.duyvv.citizen_card_app.domain.ApplicationState
 import com.duyvv.citizen_card_app.domain.repository.DataRepository
 import com.duyvv.citizen_card_app.domain.repository.JavaCardRepository
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 class HomeViewModel(
     private val cardRepository: JavaCardRepository,
     private val dataRepository: DataRepository,
 ) : BaseViewModel<HomeUIState>(HomeUIState()) {
 
-    var createCitizen: Citizen? = null
+    var citizen: Citizen? = null
 
     fun connectCard(pinCode: String) {
         viewModelHandlerScope.launch {
@@ -72,20 +74,28 @@ class HomeViewModel(
         updateUiState { it.reset() }
     }
 
-    fun verifyPinCard(pinCode: String) {
+    fun verifyPinCode(pinCode: String) {
+        verifyPinCard(pinCode) {
+            println("Card connected successfully!")
+            ApplicationState.setCardVerified(true)
+            updateUiState {
+                it.copy(
+                    isShowNoticeDialog = false,
+                    isShowErrorPinCodeDialog = false,
+                    isShowPinDialog = false
+                )
+            }
+            viewModelHandlerScope.launch {
+                getCardInfo()
+            }
+        }
+    }
+
+    fun verifyPinCard(pinCode: String, onSuccess: () -> Unit) {
         viewModelHandlerScope.launch {
             val (isCardVerified, pinAttemptsRemain) = cardRepository.verifyCard(pinCode)
             if (isCardVerified) {
-                println("Card connected successfully!")
-                ApplicationState.setCardVerified(true)
-                updateUiState {
-                    it.copy(
-                        isShowNoticeDialog = false,
-                        isShowErrorPinCodeDialog = false,
-                        isShowPinDialog = false
-                    )
-                }
-                getCardInfo()
+                onSuccess.invoke()
             } else {
                 if (pinAttemptsRemain > 0) {
                     updateUiState {
@@ -118,7 +128,7 @@ class HomeViewModel(
     fun setupPinCode(pinCode: String, citizen: Citizen) {
         viewModelHandlerScope.launch {
             println("setupPinCode11111: ")
-            val latestId = dataRepository.getLatestCitizenId()
+            val latestId = dataRepository.getLatestCitizenId(SimpleDateFormat("ddMMyy").format(Date()))
             println("setupPinCode: $latestId")
             cardRepository.setupPinCode(pinCode, citizen, latestId) { isSuccess, newCitizen, publicKey ->
                 if (isSuccess && newCitizen != null && publicKey != null) {
@@ -127,7 +137,7 @@ class HomeViewModel(
                     updateUiState {
                         it.copy(
                             isShowNoticeDialog = true,
-                            noticeMessage = "Thiết lập mã PIN thất bại, vui lòng thử lại!"
+                            noticeMessage = "Thiết lập thông tin thất bại, vui lòng thử lại!"
                         )
                     }
                 }
@@ -159,7 +169,77 @@ class HomeViewModel(
         }
     }
 
-    fun updateCardInfo() {
+    fun changePin(oldPin: String, newPin: String) {
+        viewModelHandlerScope.launch {
+            val isSuccess = cardRepository.changePin(oldPin, newPin)
+            if (isSuccess) {
+                updateUiState {
+                    it.copy(
+                        isShowNoticeDialog = true,
+                        isShowChangePinDialog = false,
+                        noticeMessage = "Thay đổi mã pin thành công!"
+                    )
+                }
+            } else {
+                updateUiState {
+                    it.copy(
+                        isShowNoticeDialog = true,
+                        noticeMessage = "Thay đổi mã pin thất bại, vui lòng thử lại!"
+                    )
+                }
+            }
+        }
+    }
+
+    fun updateCardInfo(pinCode: String) {
+        verifyPinCard(pinCode) {
+            if (citizen?.avatar == null) {
+                updateUiState { it.copy(isShowNoticeDialog = true, noticeMessage = "Ảnh không hợp lệ!") }
+            } else {
+                viewModelHandlerScope.launch {
+                    val isSendSuccess = cardRepository.sendAvatar(citizen?.avatar!!)
+                    if (!isSendSuccess) {
+                        updateUiState { it.copy(isShowNoticeDialog = true, noticeMessage = "Cập nhật ảnh thất bại!") }
+                    } else {
+                        val isUpdated = cardRepository.updateCardInfo(citizen!!)
+                        updateUiState {
+                            it.copy(
+                                isShowNoticeDialog = true,
+                                noticeMessage = "Cập nhật thông tin xuống thẻ thành công!"
+                            )
+                        }
+                        if (isUpdated) {
+                            val isSuccess = dataRepository.updateCitizen(citizen!!)
+                            if (isSuccess) {
+                                updateUiState {
+                                    it.copy(
+                                        isShowNoticeDialog = true,
+                                        isShowPinConfirmChangeInfoDialog = false,
+                                        isShowEditInfoDialog = false,
+                                        noticeMessage = "Cập nhật thông tin thành công!"
+                                    )
+                                }
+                                getCardInfo()
+                            } else {
+                                updateUiState {
+                                    it.copy(
+                                        isShowNoticeDialog = true,
+                                        noticeMessage = "Cập nhật thông tin thất bại!"
+                                    )
+                                }
+                            }
+                        } else {
+                            updateUiState {
+                                it.copy(
+                                    isShowNoticeDialog = true,
+                                    noticeMessage = "Cập nhật thông tin thất bại!"
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
     }
 
@@ -182,14 +262,17 @@ class HomeViewModel(
     fun showSetupPinDialog(isShow: Boolean) {
         updateUiState { it.copy(isShowSetupPinDialog = isShow) }
     }
+
     fun showChangePinDialog(isShow: Boolean) {
         updateUiState { it.copy(isShowChangePinDialog = isShow) }
     }
+
     fun showEditInfoDialog(isShow: Boolean) {
         updateUiState { it.copy(isShowEditInfoDialog = isShow) }
     }
+
     fun isShowPinConfirmDialog(isShow: Boolean) {
-        updateUiState { it.copy(isShowPinConfirmDialog = isShow) }
+        updateUiState { it.copy(isShowPinConfirmChangeInfoDialog = isShow) }
     }
 }
 
@@ -204,7 +287,7 @@ data class HomeUIState(
     val cardInfo: Citizen? = null,
     val errorMessage: String = "",
     val isShowEditInfoDialog: Boolean = false,
-    val isShowPinConfirmDialog: Boolean = false,
+    val isShowPinConfirmChangeInfoDialog: Boolean = false,
 ) : UiState {
     fun reset() = copy(
         isShowPinDialog = false,
@@ -215,6 +298,7 @@ data class HomeUIState(
         isShowChangePinDialog = false,
         cardInfo = null,
         errorMessage = "",
-        isShowEditInfoDialog = false
+        isShowEditInfoDialog = false,
+        isShowPinConfirmChangeInfoDialog = false,
     )
 }

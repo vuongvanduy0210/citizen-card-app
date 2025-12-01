@@ -12,8 +12,11 @@ import com.duyvv.citizen_card_app.data.local.table.CitizenTable
 import com.duyvv.citizen_card_app.domain.repository.DataRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.jetbrains.exposed.sql.Op
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder
 import org.jetbrains.exposed.sql.andWhere
+import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
@@ -120,12 +123,9 @@ class DataRepositoryImpl : DataRepository {
         !CitizenTable.selectAll().where { CitizenTable.citizenId eq citizenId }.empty()
     }
 
-    override suspend fun getLatestCitizenId(): String? = dbQuery {
-        // Lấy ID mới nhất để sinh mã tự động (Logic cũ: ORDER BY ROWID DESC LIMIT 1)
-        // Trong Exposed SQLite, ta có thể sort theo citizenId nếu nó có tính thứ tự,
-        // hoặc đơn giản là lấy row cuối cùng được insert.
-        // Ở đây giả sử sort theo citizenId giảm dần.
+    override suspend fun getLatestCitizenId(prefix: String): String? = dbQuery {
         CitizenTable.select(CitizenTable.citizenId)
+            .where { CitizenTable.citizenId like "$prefix%" } // Quan trọng: like 'ddMMyy%'
             .orderBy(CitizenTable.citizenId, SortOrder.DESC)
             .limit(1)
             .singleOrNull()

@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,18 +54,44 @@ fun ChangePinDialog(
 
     // Hàm validate và submit dùng chung
     fun validateAndSubmit() {
+        errorMessage = "" // Reset lỗi trước khi kiểm tra
+
+        // 1. Kiểm tra Rỗng
+        if (isChangePin && oldPin.isBlank()) {
+            errorMessage = "Vui lòng nhập mã PIN cũ"
+            return
+        }
+        if (newPin.isBlank()) {
+            errorMessage = "Vui lòng nhập mã PIN mới"
+            return
+        }
+        if (confirmPin.isBlank()) {
+            errorMessage = "Vui lòng nhập lại mã PIN mới"
+            return
+        }
+
+        // 2. Kiểm tra Độ dài (Phải đủ 6 số)
         if (isChangePin && oldPin.length < 6) {
-            errorMessage = "Vui lòng nhập mã PIN cũ (6 số)"
+            errorMessage = "Mã PIN cũ phải đủ 6 ký tự"
             return
         }
         if (newPin.length < 6) {
-            errorMessage = "Mã PIN mới phải đủ 6 số"
+            errorMessage = "Mã PIN mới phải đủ 6 ký tự"
             return
         }
+
+        // 3. Kiểm tra Logic nghiệp vụ
         if (newPin != confirmPin) {
             errorMessage = "Mã PIN xác nhận không khớp"
             return
         }
+
+        // Kiểm tra trùng PIN cũ (chỉ khi đang đổi PIN)
+        if (isChangePin && oldPin == newPin) {
+            errorMessage = "Mã PIN mới không được trùng với mã PIN cũ"
+            return
+        }
+
         // Nếu tất cả hợp lệ -> Gửi callback
         onConfirm(oldPin, newPin)
     }
@@ -128,7 +158,8 @@ fun ChangePinDialog(
                         text = errorMessage,
                         color = ColorRed,
                         fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center
                     )
                 }
 
@@ -180,38 +211,58 @@ fun PinInputField(
     imeAction: ImeAction = ImeAction.Next,
     onDone: () -> Unit = {}
 ) {
+    var isPasswordVisible by remember { mutableStateOf(false) }
+
     OutlinedTextField(
         value = value,
-        onValueChange = onValueChange,
-        visualTransformation = PasswordVisualTransformation(), // Ẩn ký tự thành dấu chấm
+        onValueChange = {
+            if (it.any { char -> !char.isDigit() }) return@OutlinedTextField
+            onValueChange.invoke(it)
+        },
+        visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
         singleLine = true,
         placeholder = {
             Text(
                 text = placeholder,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
-                color = ColorTextSecondary, // Màu chữ phụ
+                color = ColorTextSecondary,
                 fontSize = 16.sp
             )
         },
         textStyle = LocalTextStyle.current.copy(
             textAlign = TextAlign.Center,
             fontSize = 18.sp,
-            color = ColorInputText // Màu chữ nhập vào
+            color = ColorInputText
         ),
         modifier = Modifier
             .fillMaxWidth()
             .height(55.dp),
-        shape = RoundedCornerShape(8.dp), // bo góc 5px
+        shape = RoundedCornerShape(8.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = ColorInputBg, // Màu nền input
+            focusedContainerColor = ColorInputBg,
             unfocusedContainerColor = ColorInputBg,
-            focusedBorderColor = ColorInputBorder, // Viền khi focus
-            unfocusedBorderColor = ColorInputBorder, // Viền mặc định
+            focusedBorderColor = ColorInputBorder,
+            unfocusedBorderColor = ColorInputBorder,
             cursorColor = ColorInputText
         ),
+        // 3. Thêm nút con mắt (Trailing Icon)
+        trailingIcon = {
+            val image = if (isPasswordVisible)
+                Icons.Filled.Visibility
+            else
+                Icons.Filled.VisibilityOff
+
+            IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                Icon(
+                    imageVector = image,
+                    contentDescription = if (isPasswordVisible) "Hide PIN" else "Show PIN",
+                    tint = ColorTextSecondary
+                )
+            }
+        },
         keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.NumberPassword, // Bàn phím số
+            keyboardType = KeyboardType.NumberPassword,
             imeAction = imeAction
         ),
         keyboardActions = KeyboardActions(onDone = { onDone() })

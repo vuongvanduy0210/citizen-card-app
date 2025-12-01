@@ -71,13 +71,21 @@ fun MainScreen() {
                 },
                 onPinChangeClick = {
                     viewModel.showChangePinDialog(true)
+                },
+                onEditInfoClick = {
+                    viewModel.showEditInfoDialog(true)
                 }
             )
 
             val isAnyDialogVisible = uiState.isShowPinDialog ||
                     uiState.isShowErrorPinCodeDialog ||
                     uiState.isShowNoticeDialog ||
-                    uiState.isCreateInfoDialog
+                    uiState.isCreateInfoDialog ||
+                    uiState.isShowSetupPinDialog ||
+                    uiState.isShowChangePinDialog ||
+                    uiState.isShowEditInfoDialog ||
+                    uiState.isShowPinConfirmChangeInfoDialog
+
 
             AnimatedVisibility(
                 visible = isAnyDialogVisible,
@@ -96,7 +104,7 @@ fun MainScreen() {
             // --- 1. PIN Dialog Animation (Spring Pop-up) ---
             // Hiệu ứng nảy (Bouncy) khi hiện ra
             AnimatedVisibility(
-                visible = uiState.isShowPinDialog || uiState.isShowPinConfirmDialog,
+                visible = uiState.isShowPinDialog || uiState.isShowPinConfirmChangeInfoDialog,
                 enter = fadeIn(tween(200)) + scaleIn(
                     initialScale = 0.8f,
                     animationSpec = spring(
@@ -116,13 +124,15 @@ fun MainScreen() {
                         onClickLeftBtn = {
                             when {
                                 uiState.isShowPinDialog -> viewModel.showPinDialog(false)
-                                uiState.isShowPinConfirmDialog -> viewModel.isShowPinConfirmDialog(false)
+                                uiState.isShowPinConfirmChangeInfoDialog -> viewModel.isShowPinConfirmDialog(false)
                             }
                         },
                         onClickRightBtn = { pinCode ->
                             when {
                                 uiState.isShowPinDialog -> viewModel.connectCard(pinCode)
-//                                uiState.isShowPinConfirmDialog -> viewModel.connectCard(pinCode)
+                                uiState.isShowPinConfirmChangeInfoDialog -> {
+                                    viewModel.updateCardInfo(pinCode)
+                                }
                             }
                         }
                     )
@@ -148,7 +158,7 @@ fun MainScreen() {
                             viewModel.showErrorPinCodeDialog(false)
                         },
                         onClickRightBtn = { pinCode ->
-                            viewModel.verifyPinCard(pinCode)
+                            viewModel.verifyPinCode(pinCode)
                         }
                     )
                 }
@@ -193,7 +203,7 @@ fun MainScreen() {
                         citizen = uiState.cardInfo,
                         onDismiss = { viewModel.showCreateInfoDialog(false) },
                         onSave = { citizen ->
-                            viewModel.createCitizen = citizen
+                            viewModel.citizen = citizen
                             viewModel.showSetupPinDialog(true)
                             viewModel.showCreateInfoDialog(false)
                         }
@@ -222,7 +232,7 @@ fun MainScreen() {
                             viewModel.showSetupPinDialog(false)
                         },
                         onConfirm = { _, newPin ->
-                            viewModel.createCitizen?.let { viewModel.setupPinCode(newPin, it) }
+                            viewModel.citizen?.let { viewModel.setupPinCode(newPin, it) }
                         }
                     )
                 }
@@ -249,7 +259,7 @@ fun MainScreen() {
                             viewModel.showChangePinDialog(false)
                         },
                         onConfirm = { oldPin, newPin ->
-
+                            viewModel.changePin(oldPin, newPin)
                         }
                     )
                 }
@@ -274,7 +284,7 @@ fun MainScreen() {
                         citizen = uiState.cardInfo,
                         onDismiss = { viewModel.showEditInfoDialog(false) },
                         onSave = { citizen ->
-                            viewModel.showEditInfoDialog(false)
+                            viewModel.citizen = citizen
                             viewModel.isShowPinConfirmDialog(true)
                         }
                     )

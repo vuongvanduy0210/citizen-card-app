@@ -318,6 +318,32 @@ class JavaCardRepositoryImpl : JavaCardRepository {
         ApplicationState.reset()
     }
 
+    override suspend fun changePin(oldPin: String, newPin: String): Boolean = withContext(Dispatchers.IO) {
+        when (val result = sendApdu(0x00, 0x03, 0x04, 0x00,stringToHexArray("$oldPin$$newPin"))) {
+            is ApduResult.Success -> {
+                println("change pin success! ${bytesToHex(result.response)}")
+                true
+            }
+            is ApduResult.Failed -> {
+                println("change pin failed! ${bytesToHex(result.response)}")
+                false
+            }
+        }
+    }
+
+    override suspend fun updateCardInfo(citizen: Citizen): Boolean = withContext(Dispatchers.IO) {
+        when (val result = sendApdu(0x00, 0x03, 0x05, 0x07, stringToHexArray(citizen.toCardInfo()))) {
+            is ApduResult.Success -> {
+                println("Update data to card success: ${bytesToHex(result.response)}")
+                true
+            }
+            is ApduResult.Failed -> {
+                println("Update data to card failed: ${bytesToHex(result.response)}")
+                false
+            }
+        }
+    }
+
     fun hexToString(hexInput: String?): String {
         val hex = hexInput?.replace(" ", "") ?: return ""
         println("Hex to string: $hex")

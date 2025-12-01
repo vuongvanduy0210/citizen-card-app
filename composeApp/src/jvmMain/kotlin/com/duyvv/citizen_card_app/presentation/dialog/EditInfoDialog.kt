@@ -61,7 +61,7 @@ fun EditInfoDialog(
     var newAvatar by remember {
         mutableStateOf(
             citizen?.avatar?.let {
-                ImageFile(bytes = it, "")
+                ImageFile(bytes = it, "avatar")
             }
         )
     }
