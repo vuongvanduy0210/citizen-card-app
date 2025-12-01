@@ -67,14 +67,17 @@ fun MainScreen() {
                     }
                 },
                 onClickCreateInfo = {
-                    viewModel.showEditInfoDialog(true)
+                    viewModel.showCreateInfoDialog(true)
+                },
+                onPinChangeClick = {
+                    viewModel.showChangePinDialog(true)
                 }
             )
 
             val isAnyDialogVisible = uiState.isShowPinDialog ||
                     uiState.isShowErrorPinCodeDialog ||
                     uiState.isShowNoticeDialog ||
-                    uiState.isShowEditInfoDialog
+                    uiState.isCreateInfoDialog
 
             AnimatedVisibility(
                 visible = isAnyDialogVisible,
@@ -93,7 +96,7 @@ fun MainScreen() {
             // --- 1. PIN Dialog Animation (Spring Pop-up) ---
             // Hiệu ứng nảy (Bouncy) khi hiện ra
             AnimatedVisibility(
-                visible = uiState.isShowPinDialog,
+                visible = uiState.isShowPinDialog || uiState.isShowPinConfirmDialog,
                 enter = fadeIn(tween(200)) + scaleIn(
                     initialScale = 0.8f,
                     animationSpec = spring(
@@ -111,10 +114,16 @@ fun MainScreen() {
                         leftLabel = "Huỷ",
                         rightLabel = "Xác nhận",
                         onClickLeftBtn = {
-                            viewModel.showPinDialog(false)
+                            when {
+                                uiState.isShowPinDialog -> viewModel.showPinDialog(false)
+                                uiState.isShowPinConfirmDialog -> viewModel.isShowPinConfirmDialog(false)
+                            }
                         },
                         onClickRightBtn = { pinCode ->
-                            viewModel.connectCard(pinCode)
+                            when {
+                                uiState.isShowPinDialog -> viewModel.connectCard(pinCode)
+//                                uiState.isShowPinConfirmDialog -> viewModel.connectCard(pinCode)
+                            }
                         }
                     )
                 }
@@ -166,7 +175,7 @@ fun MainScreen() {
 
             // --- 4. Edit Info Dialog Animation (Slide Up + Expand) ---
             AnimatedVisibility(
-                visible = uiState.isShowEditInfoDialog,
+                visible = uiState.isCreateInfoDialog,
                 enter = fadeIn(tween(300)) + slideInVertically(
                     initialOffsetY = { it }, // Trượt từ đáy màn hình lên
                     animationSpec = spring(
@@ -182,11 +191,11 @@ fun MainScreen() {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     EditInfoDialog(
                         citizen = uiState.cardInfo,
-                        onDismiss = { viewModel.showEditInfoDialog(false) },
+                        onDismiss = { viewModel.showCreateInfoDialog(false) },
                         onSave = { citizen ->
                             viewModel.createCitizen = citizen
                             viewModel.showSetupPinDialog(true)
-                            viewModel.showEditInfoDialog(false)
+                            viewModel.showCreateInfoDialog(false)
                         }
                     )
                 }
@@ -218,6 +227,59 @@ fun MainScreen() {
                     )
                 }
             }
+
+            AnimatedVisibility(
+                visible = uiState.isShowChangePinDialog,
+                enter = fadeIn(tween(300)) + slideInVertically(
+                    initialOffsetY = { it }, // Trượt từ đáy màn hình lên
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                ),
+                exit = fadeOut(tween(200)) + slideOutVertically(
+                    targetOffsetY = { it },
+                    animationSpec = tween(200)
+                )
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    ChangePinDialog(
+                        isChangePin = true,
+                        onDismiss = {
+                            viewModel.showChangePinDialog(false)
+                        },
+                        onConfirm = { oldPin, newPin ->
+
+                        }
+                    )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = uiState.isShowEditInfoDialog,
+                enter = fadeIn(tween(300)) + slideInVertically(
+                    initialOffsetY = { it }, // Trượt từ đáy màn hình lên
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                ),
+                exit = fadeOut(tween(200)) + slideOutVertically(
+                    targetOffsetY = { it }, // Trượt xuống đáy
+                    animationSpec = tween(200)
+                )
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    EditInfoDialog(
+                        citizen = uiState.cardInfo,
+                        onDismiss = { viewModel.showEditInfoDialog(false) },
+                        onSave = { citizen ->
+                            viewModel.showEditInfoDialog(false)
+                            viewModel.isShowPinConfirmDialog(true)
+                        }
+                    )
+                }
+            }
         }
     }
 }
@@ -227,7 +289,12 @@ fun SystemManagerApp(
     citizen: Citizen?,
     isCardConnected: Boolean,
     onClickConnectCard: () -> Unit = {},
-    onClickCreateInfo: () -> Unit
+    onClickCreateInfo: () -> Unit,
+    onPinChangeClick: () -> Unit = {},
+    onEditInfoClick: () -> Unit = {},
+    onIntegratedDocumentClick: () -> Unit = {},
+    onLockCardClick: () -> Unit = {},
+    onUnlockCardClick: () -> Unit = {}
 ) {
     var selectedTabIndex by remember { mutableStateOf(0) }
 
@@ -261,7 +328,17 @@ fun SystemManagerApp(
             // --- TAB CONTENT ---
             Box(modifier = Modifier.fillMaxSize()) {
                 when (selectedTabIndex) {
-                    0 -> HomeTabContent(isCardConnected, citizen, onClickCreateInfo)
+                    0 -> HomeTabContent(
+                        isCardConnected = isCardConnected,
+                        citizen = citizen,
+                        onClickCreateInfo = onClickCreateInfo,
+                        onPinChangeClick = onPinChangeClick,
+                        onEditInfoClick = onEditInfoClick,
+                        onLockCardClick = onLockCardClick,
+                        onUnlockCardClick = onUnlockCardClick,
+                        onIntegratedDocumentClick = onIntegratedDocumentClick
+                    )
+
                     1 -> ManageCitizenTabContent()
                 }
             }

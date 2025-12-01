@@ -35,7 +35,7 @@ fun main() = application {
     }
     Window(
         onCloseRequest = ::exitApplication,
-        title = "citizen_card_app",
+        title = "Citizen Card App"
     ) {
         App()
     }

@@ -9,13 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.CreditCardOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,24 +20,32 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.duyvv.citizen_card_app.data.local.entity.Citizen
-import com.duyvv.citizen_card_app.presentation.ui.theme.ColorAvatarBg
-import com.duyvv.citizen_card_app.presentation.ui.theme.ColorBgContainer
-import com.duyvv.citizen_card_app.presentation.ui.theme.ColorBgRoot
-import com.duyvv.citizen_card_app.presentation.ui.theme.ColorBorderContainer
-import com.duyvv.citizen_card_app.presentation.ui.theme.ColorFieldBg
-import com.duyvv.citizen_card_app.presentation.ui.theme.ColorFieldBorder
-import com.duyvv.citizen_card_app.presentation.ui.theme.ColorLabelText
-import com.duyvv.citizen_card_app.presentation.ui.theme.ColorTextPrimary
-import com.duyvv.citizen_card_app.presentation.ui.theme.ColorTextSecondary
+import com.duyvv.citizen_card_app.presentation.ui.theme.*
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
-fun HomeTabContent(isCardConnected: Boolean, citizen: Citizen?, onClickCreateInfo: () -> Unit) {
+fun HomeTabContent(
+    isCardConnected: Boolean,
+    citizen: Citizen?,
+    onClickCreateInfo: () -> Unit,
+    onPinChangeClick: () -> Unit = {},
+    onEditInfoClick: () -> Unit = {},
+    onIntegratedDocumentClick: () -> Unit = {},
+    onLockCardClick: () -> Unit = {},
+    onUnlockCardClick: () -> Unit = {}
+) {
     if (isCardConnected) {
         if (citizen == null) {
             EmptyCardScreen(onClickCreateInfo)
         } else {
-            CitizenInfoScreen(citizen)
+            CitizenInfoScreen(
+                citizen = citizen,
+                onEditInfoClick = onEditInfoClick,
+                onPinChangeClick = onPinChangeClick,
+                onLockCardClick = onLockCardClick,
+                onIntegratedDocumentClick = onIntegratedDocumentClick,
+                onUnlockCardClick = onUnlockCardClick,
+            )
         }
     } else {
         Box(
@@ -198,8 +200,8 @@ fun CitizenInfoScreen(
         // --- Main Container ---
         Card(
             modifier = Modifier
-                .width(900.dp)
-                .padding(20.dp)
+                .width(1000.dp)
+                .padding(100.dp)
                 .border(2.dp, ColorBorderContainer, RoundedCornerShape(10.dp)),
             shape = RoundedCornerShape(10.dp),
             colors = CardDefaults.cardColors(containerColor = ColorBgContainer),

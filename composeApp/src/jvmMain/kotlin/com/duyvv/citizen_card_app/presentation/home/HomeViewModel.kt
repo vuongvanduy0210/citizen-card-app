@@ -109,7 +109,7 @@ class HomeViewModel(
     suspend fun getCardInfo() {
         val cardInfo = cardRepository.getCardInfo()
         if (cardInfo == null) {
-            updateUiState { it.copy(isShowEditInfoDialog = true, cardInfo = null) }
+            updateUiState { it.copy(isCreateInfoDialog = true, cardInfo = null) }
         } else {
             updateUiState { it.copy(cardInfo = cardInfo) }
         }
@@ -159,6 +159,10 @@ class HomeViewModel(
         }
     }
 
+    fun updateCardInfo() {
+
+    }
+
     fun showPinDialog(isShow: Boolean) {
         updateUiState { it.copy(isShowPinDialog = isShow) }
     }
@@ -171,12 +175,21 @@ class HomeViewModel(
         updateUiState { it.copy(isShowNoticeDialog = isShow) }
     }
 
-    fun showEditInfoDialog(isShow: Boolean) {
-        updateUiState { it.copy(isShowEditInfoDialog = isShow) }
+    fun showCreateInfoDialog(isShow: Boolean) {
+        updateUiState { it.copy(isCreateInfoDialog = isShow) }
     }
 
     fun showSetupPinDialog(isShow: Boolean) {
         updateUiState { it.copy(isShowSetupPinDialog = isShow) }
+    }
+    fun showChangePinDialog(isShow: Boolean) {
+        updateUiState { it.copy(isShowChangePinDialog = isShow) }
+    }
+    fun showEditInfoDialog(isShow: Boolean) {
+        updateUiState { it.copy(isShowEditInfoDialog = isShow) }
+    }
+    fun isShowPinConfirmDialog(isShow: Boolean) {
+        updateUiState { it.copy(isShowPinConfirmDialog = isShow) }
     }
 }
 
@@ -185,18 +198,23 @@ data class HomeUIState(
     val isShowErrorPinCodeDialog: Boolean = false,
     val isShowNoticeDialog: Boolean = false,
     val noticeMessage: String = "",
-    val isShowEditInfoDialog: Boolean = false,
+    val isCreateInfoDialog: Boolean = false,
     val isShowSetupPinDialog: Boolean = false,
+    val isShowChangePinDialog: Boolean = false,
     val cardInfo: Citizen? = null,
-    val errorMessage: String = ""
+    val errorMessage: String = "",
+    val isShowEditInfoDialog: Boolean = false,
+    val isShowPinConfirmDialog: Boolean = false,
 ) : UiState {
     fun reset() = copy(
         isShowPinDialog = false,
         isShowErrorPinCodeDialog = false,
         isShowNoticeDialog = false,
         noticeMessage = "",
-        isShowEditInfoDialog = false,
+        isCreateInfoDialog = false,
+        isShowChangePinDialog = false,
         cardInfo = null,
-        errorMessage = ""
+        errorMessage = "",
+        isShowEditInfoDialog = false
     )
 }
