@@ -40,4 +40,7 @@ interface DataRepository {
     suspend fun insertHealthInsurance(insurance: HealthInsurance): Boolean
     suspend fun updateHealthInsurance(insurance: HealthInsurance): Boolean
     suspend fun deleteHealthInsurance(citizenId: String): Boolean
+    suspend fun saveVehicleRegister(vehicle: VehicleRegister): Boolean
+    suspend fun saveDrivingLicense(license: DrivingLicense): Boolean
+    suspend fun saveHealthInsurance(insurance: HealthInsurance): Boolean
 }

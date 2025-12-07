@@ -12,7 +12,7 @@ object VehicleRegisterDao {
         VehicleRegisterTable.insert {
             it[citizenId] = v.citizenId
             // vehicleRegisterId là tự tăng, thường không insert thủ công trừ khi cần thiết
-            // it[vehicleRegisterId] = v.vehicleRegisterId
+            it[vehicleRegisterId] = v.vehicleRegisterId
             it[vehicleBrand] = v.vehicleBrand
             it[vehicleModel] = v.vehicleModel
             it[vehicleColor] = v.vehicleColor

@@ -12,11 +12,8 @@ import com.duyvv.citizen_card_app.data.local.table.CitizenTable
 import com.duyvv.citizen_card_app.domain.repository.DataRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.jetbrains.exposed.sql.Op
 import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder
 import org.jetbrains.exposed.sql.andWhere
-import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
@@ -169,6 +166,22 @@ class DataRepositoryImpl : DataRepository {
         }
     }
 
+    override suspend fun saveDrivingLicense(license: DrivingLicense): Boolean = dbQuery {
+        try {
+            val list = DrivingLicenseDao.getByCitizenId(license.citizenId)
+            val exists = list.any { it.licenseId == license.licenseId }
+            if (exists) {
+                DrivingLicenseDao.update(license)
+            } else {
+                DrivingLicenseDao.insert(license)
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
     // ==================================================================================
     // 4. ĐĂNG KÝ XE (VEHICLE REGISTER)
     // ==================================================================================
@@ -206,6 +219,26 @@ class DataRepositoryImpl : DataRepository {
         }
     }
 
+    // --- LOGIC UPSERT (Save) ---
+    override suspend fun saveVehicleRegister(vehicle: VehicleRegister): Boolean = dbQuery {
+        try {
+            val list = VehicleRegisterDao.getByCitizenId(vehicle.citizenId)
+
+            // Logic mới: Kiểm tra trùng ID (Số đăng ký xe)
+            val exists = list.any { it.vehicleRegisterId == vehicle.vehicleRegisterId }
+
+            if (exists) {
+                VehicleRegisterDao.update(vehicle)
+            } else {
+                VehicleRegisterDao.insert(vehicle)
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
     // ==================================================================================
     // 5. BẢO HIỂM Y TẾ (HEALTH INSURANCE)
     // ==================================================================================
@@ -237,6 +270,25 @@ class DataRepositoryImpl : DataRepository {
     override suspend fun deleteHealthInsurance(citizenId: String): Boolean = dbQuery {
         try {
             HealthInsuranceDao.deleteByCitizenId(citizenId) > 0
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    // --- LOGIC UPSERT (Save) ---
+    override suspend fun saveHealthInsurance(insurance: HealthInsurance): Boolean = dbQuery {
+        try {
+            val list = HealthInsuranceDao.getByCitizenId(insurance.citizenId)
+            // Kiểm tra mã số thẻ bảo hiểm
+            val exists = list.any { it.insuranceId == insurance.insuranceId }
+
+            if (exists) {
+                HealthInsuranceDao.update(insurance)
+            } else {
+                HealthInsuranceDao.insert(insurance)
+            }
+            true
         } catch (e: Exception) {
             e.printStackTrace()
             false

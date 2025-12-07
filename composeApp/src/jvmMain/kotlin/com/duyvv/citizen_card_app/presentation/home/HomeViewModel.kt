@@ -3,6 +3,9 @@ package com.duyvv.citizen_card_app.presentation.home
 import com.duyvv.citizen_card_app.base.BaseViewModel
 import com.duyvv.citizen_card_app.base.UiState
 import com.duyvv.citizen_card_app.data.local.entity.Citizen
+import com.duyvv.citizen_card_app.data.local.entity.DrivingLicense
+import com.duyvv.citizen_card_app.data.local.entity.HealthInsurance
+import com.duyvv.citizen_card_app.data.local.entity.VehicleRegister
 import com.duyvv.citizen_card_app.domain.ApplicationState
 import com.duyvv.citizen_card_app.domain.repository.DataRepository
 import com.duyvv.citizen_card_app.domain.repository.JavaCardRepository
@@ -270,6 +273,51 @@ class HomeViewModel(
         }
     }
 
+    fun saveVehicle(vehicle: VehicleRegister) {
+        viewModelHandlerScope.launch {
+            val success = dataRepository.saveVehicleRegister(vehicle)
+            showNoticeResult(success, "Lưu giấy đăng ký xe")
+
+            // --- THÊM DÒNG NÀY ---
+            if (success) {
+                loadIntegratedDocuments(vehicle.citizenId)
+            }
+        }
+    }
+
+    fun saveDrivingLicense(license: DrivingLicense) {
+        viewModelHandlerScope.launch {
+            val success = dataRepository.saveDrivingLicense(license)
+            showNoticeResult(success, "Lưu giấy phép lái xe")
+
+            // --- THÊM DÒNG NÀY ---
+            if (success) {
+                loadIntegratedDocuments(license.citizenId)
+            }
+        }
+    }
+
+    fun saveHealthInsurance(insurance: HealthInsurance) {
+        viewModelHandlerScope.launch {
+            val success = dataRepository.saveHealthInsurance(insurance)
+            showNoticeResult(success, "Lưu bảo hiểm y tế")
+
+            // --- THÊM DÒNG NÀY ---
+            if (success) {
+                loadIntegratedDocuments(insurance.citizenId)
+            }
+        }
+    }
+
+    private fun showNoticeResult(isSuccess: Boolean, title: String) {
+        updateUiState {
+            it.copy(
+                isShowNoticeDialog = true,
+                noticeMessage = if (isSuccess) "$title thành công!" else "$title thất bại!"
+            )
+        }
+    }
+
     fun showPinDialog(isShow: Boolean) {
         updateUiState { it.copy(isShowPinDialog = isShow) }
     }
@@ -309,6 +357,46 @@ class HomeViewModel(
     fun isShowPinConfirmUnlockCardDialog(isShow: Boolean) {
         updateUiState { it.copy(isShowPinConfirmUnlockCardDialog = isShow) }
     }
+
+    fun showIntegratedDocumentsDialog(isShow: Boolean) {
+        if (isShow) {
+            val currentCitizenId = uiStateFlow.value.cardInfo?.citizenId
+            if (currentCitizenId != null) {
+                // Hiện dialog trước
+                updateUiState { it.copy(isShowIntegratedDocumentsDialog = true) }
+                // Sau đó tải dữ liệu
+                loadIntegratedDocuments(currentCitizenId)
+            }
+        } else {
+            // Đóng dialog và reset dữ liệu
+            updateUiState {
+                it.copy(
+                    isShowIntegratedDocumentsDialog = false,
+                    currentVehicle = null,
+                    currentLicense = null,
+                    currentInsurance = null
+                )
+            }
+        }
+    }
+
+    private fun loadIntegratedDocuments(citizenId: String) {
+        println("Loading integrated documents ...")
+        viewModelHandlerScope.launch {
+            val vehicles = dataRepository.getVehicleRegisterByCitizenId(citizenId)
+            val licenses = dataRepository.getDrivingLicenseByCitizenId(citizenId)
+            val insurances = dataRepository.getHealthInsuranceByCitizenId(citizenId)
+
+            updateUiState {
+                it.copy(
+                    // Cập nhật lại dữ liệu mới nhất từ DB vào State
+                    currentVehicle = vehicles.firstOrNull(),
+                    currentLicense = licenses.firstOrNull(),
+                    currentInsurance = insurances.firstOrNull()
+                )
+            }
+        }
+    }
 }
 
 data class HomeUIState(
@@ -325,6 +413,10 @@ data class HomeUIState(
     val isShowPinConfirmChangeInfoDialog: Boolean = false,
     val isShowPinConfirmLockCardDialog: Boolean = false,
     val isShowPinConfirmUnlockCardDialog: Boolean = false,
+    val isShowIntegratedDocumentsDialog: Boolean = false,
+    val currentVehicle: VehicleRegister? = null,
+    val currentLicense: DrivingLicense? = null,
+    val currentInsurance: HealthInsurance? = null
 ) : UiState {
     fun reset() = copy(
         isShowPinDialog = false,
@@ -338,6 +430,7 @@ data class HomeUIState(
         isShowEditInfoDialog = false,
         isShowPinConfirmChangeInfoDialog = false,
         isShowPinConfirmLockCardDialog = false,
-        isShowPinConfirmUnlockCardDialog = false
+        isShowPinConfirmUnlockCardDialog = false,
+        isShowIntegratedDocumentsDialog = false
     )
 }

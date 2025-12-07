@@ -26,10 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.duyvv.citizen_card_app.data.local.entity.Citizen
 import com.duyvv.citizen_card_app.domain.ApplicationState
-import com.duyvv.citizen_card_app.presentation.dialog.ChangePinDialog
-import com.duyvv.citizen_card_app.presentation.dialog.EditInfoDialog
-import com.duyvv.citizen_card_app.presentation.dialog.EnterPinDialog
-import com.duyvv.citizen_card_app.presentation.dialog.NoticeDialog
+import com.duyvv.citizen_card_app.presentation.dialog.*
 import com.duyvv.citizen_card_app.presentation.ui.theme.*
 import kotlinx.coroutines.flow.combine
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -80,6 +77,9 @@ fun MainScreen() {
                 },
                 onUnlockCardClick = {
                     viewModel.isShowPinConfirmUnlockCardDialog(true)
+                },
+                onIntegratedDocumentClick = {
+                    viewModel.showIntegratedDocumentsDialog(true)
                 }
             )
 
@@ -92,7 +92,8 @@ fun MainScreen() {
                     uiState.isShowEditInfoDialog ||
                     uiState.isShowPinConfirmChangeInfoDialog ||
                     uiState.isShowPinConfirmLockCardDialog ||
-                    uiState.isShowPinConfirmUnlockCardDialog
+                    uiState.isShowPinConfirmUnlockCardDialog ||
+                    uiState.isShowIntegratedDocumentsDialog
 
 
             AnimatedVisibility(
@@ -136,7 +137,9 @@ fun MainScreen() {
                                 uiState.isShowPinDialog -> viewModel.showPinDialog(false)
                                 uiState.isShowPinConfirmChangeInfoDialog -> viewModel.isShowPinConfirmDialog(false)
                                 uiState.isShowPinConfirmLockCardDialog -> viewModel.isShowPinConfirmLockCardDialog(false)
-                                uiState.isShowPinConfirmUnlockCardDialog -> viewModel.isShowPinConfirmUnlockCardDialog(false)
+                                uiState.isShowPinConfirmUnlockCardDialog -> viewModel.isShowPinConfirmUnlockCardDialog(
+                                    false
+                                )
                             }
                         },
                         onClickRightBtn = { pinCode ->
@@ -145,9 +148,11 @@ fun MainScreen() {
                                 uiState.isShowPinConfirmChangeInfoDialog -> {
                                     viewModel.updateCardInfo(pinCode)
                                 }
+
                                 uiState.isShowPinConfirmLockCardDialog -> {
                                     viewModel.lockCard(pinCode)
                                 }
+
                                 uiState.isShowPinConfirmUnlockCardDialog -> {
                                     viewModel.unlockCard(pinCode)
                                 }
@@ -306,6 +311,44 @@ fun MainScreen() {
                             viewModel.isShowPinConfirmDialog(true)
                         }
                     )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = uiState.isShowIntegratedDocumentsDialog,
+                enter = fadeIn(tween(300)) + slideInVertically(
+                    initialOffsetY = { it },
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                ),
+                exit = fadeOut(tween(200)) + slideOutVertically(
+                    targetOffsetY = { it },
+                    animationSpec = tween(200)
+                )
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    val currentCitizenId = uiState.cardInfo?.citizenId ?: ""
+
+                    if (currentCitizenId.isNotEmpty()) {
+                        IntegratedDocumentsDialog(
+                            citizenId = currentCitizenId,
+                            existingVehicle = uiState.currentVehicle,
+                            existingLicense = uiState.currentLicense,
+                            existingInsurance = uiState.currentInsurance,
+                            onDismiss = { viewModel.showIntegratedDocumentsDialog(false) },
+                            onSaveVehicle = { vehicle ->
+                                viewModel.saveVehicle(vehicle)
+                            },
+                            onSaveDriving = { license ->
+                                viewModel.saveDrivingLicense(license)
+                            },
+                            onSaveHealth = { health ->
+                                viewModel.saveHealthInsurance(health)
+                            }
+                        )
+                    }
                 }
             }
         }

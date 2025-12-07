@@ -4,7 +4,7 @@ import org.jetbrains.exposed.sql.Table
 
 object VehicleRegisterTable : Table("vehicle_register") {
     val citizenId = varchar("citizenId", 32)
-    val vehicleRegisterId = integer("vehicleRegisterId").uniqueIndex()
+    val vehicleRegisterId = varchar("vehicleRegisterId", 32).uniqueIndex()
     val vehicleBrand = varchar("vehicleBrand", 100).nullable()
     val vehicleModel = varchar("vehicleModel", 100).nullable()
     val vehicleColor = varchar("vehicleColor", 50).nullable()
