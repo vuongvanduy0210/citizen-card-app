@@ -256,7 +256,16 @@ fun ManageCitizenTabContent() {
                                     // Bạn có thể update message thông báo trong ViewModel nếu muốn
                                 }
                             },
-                            onDeleteClick = { viewModel.deleteCitizen(citizen.citizenId) }
+                            onDeleteClick = {
+                                val connectedCitizenId = homeUiState.cardInfo?.citizenId
+
+                                if (connectedCitizenId != null && connectedCitizenId == citizen.citizenId) {
+                                    homeViewModel.disconnectCard()
+                                }
+
+                                // 2. Tiến hành xóa khỏi Database
+                                viewModel.deleteCitizen(citizen.citizenId)
+                            }
                         )
                         HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
                     }
@@ -372,7 +381,7 @@ fun TableRowItem(
         // Actions Column
         Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SmallFloatingActionButton(
+                /*SmallFloatingActionButton(
                     onClick = onEditClick,
                     containerColor = Color.White,
                     modifier = Modifier.size(32.dp)
@@ -383,7 +392,7 @@ fun TableRowItem(
                         tint = ColorOrange,
                         modifier = Modifier.size(16.dp)
                     )
-                }
+                }*/
                 SmallFloatingActionButton(
                     onClick = onDeleteClick,
                     containerColor = Color.White,
