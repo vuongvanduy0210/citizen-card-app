@@ -65,6 +65,28 @@ class ManageCitizenViewModel(
     fun updateFilterDob(value: String) {
         updateUiState { it.copy(filterDob = value) }
     }
+
+    fun showCitizenDetail(citizen: Citizen) {
+        updateUiState { it.copy(isShowDialogInfoCitizen = true, selectedCitizen = citizen) }
+    }
+
+    fun closeCitizenDetail() {
+        updateUiState { it.copy(isShowDialogInfoCitizen = false, selectedCitizen = null) }
+    }
+
+    fun refreshSelectedCitizen() {
+        val currentId = uiState.selectedCitizen?.citizenId ?: return
+        viewModelHandlerScope.launch {
+            val freshCitizen = repository.getCitizenById(currentId)
+            val fullList = repository.getAllCitizens()
+            updateUiState {
+                it.copy(
+                    selectedCitizen = freshCitizen,
+                    citizens = fullList
+                )
+            }
+        }
+    }
 }
 
 data class ManageCitizenUIState(

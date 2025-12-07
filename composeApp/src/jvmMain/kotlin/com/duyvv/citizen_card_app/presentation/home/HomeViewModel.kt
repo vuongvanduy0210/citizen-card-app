@@ -318,6 +318,14 @@ class HomeViewModel(
         }
     }
 
+    fun prepareForEdit(citizen: Citizen) {
+        updateUiState {
+            it.copy(
+                cardInfo = citizen
+            )
+        }
+    }
+
     fun showPinDialog(isShow: Boolean) {
         updateUiState { it.copy(isShowPinDialog = isShow) }
     }

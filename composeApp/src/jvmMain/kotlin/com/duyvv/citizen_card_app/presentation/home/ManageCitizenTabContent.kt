@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.duyvv.citizen_card_app.data.local.entity.Citizen
+import com.duyvv.citizen_card_app.presentation.dialog.CitizenInfoDialog
 import com.duyvv.citizen_card_app.presentation.ui.theme.ColorHeaderBg
 import com.duyvv.citizen_card_app.presentation.ui.theme.ColorOrange
 import com.duyvv.citizen_card_app.presentation.ui.theme.ColorRed
@@ -31,7 +32,37 @@ import java.util.*
 @Composable
 fun ManageCitizenTabContent() {
     val viewModel = koinInject<ManageCitizenViewModel>()
+    val homeViewModel = koinInject<HomeViewModel>()
     val uiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
+    val homeUiState by homeViewModel.uiStateFlow.collectAsStateWithLifecycle()
+
+    LaunchedEffect(
+        homeUiState.isShowEditInfoDialog,
+        homeUiState.isShowIntegratedDocumentsDialog,
+        homeUiState.isShowChangePinDialog,
+        homeUiState.isShowPinConfirmLockCardDialog,
+        homeUiState.isShowPinConfirmUnlockCardDialog
+    ) {
+        // Chỉ refresh khi các dialog này ĐÃ ĐÓNG (false) và đang có người được chọn
+        if (!homeUiState.isShowEditInfoDialog &&
+            !homeUiState.isShowIntegratedDocumentsDialog &&
+            !homeUiState.isShowChangePinDialog &&
+            !homeUiState.isShowPinConfirmLockCardDialog &&
+            !homeUiState.isShowPinConfirmUnlockCardDialog &&
+            uiState.selectedCitizen != null
+        ) {
+            viewModel.refreshSelectedCitizen()
+        }
+    }
+
+    LaunchedEffect(homeUiState.isShowEditInfoDialog) {
+        if (!homeUiState.isShowEditInfoDialog) {
+            // Khi đóng dialog sửa, refresh lại toàn bộ danh sách để cập nhật tên/ngày sinh mới (nếu có)
+            viewModel.refreshData()
+            // Và refresh người đang chọn (nếu có)
+            viewModel.refreshSelectedCitizen()
+        }
+    }
 
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
@@ -58,6 +89,47 @@ fun ManageCitizenTabContent() {
         ) {
             DatePicker(state = datePickerState)
         }
+    }
+
+    if (uiState.isShowDialogInfoCitizen && uiState.selectedCitizen != null) {
+        val selected = uiState.selectedCitizen!!
+
+        // 3. Kiểm tra logic:
+        // - Thẻ phải đang kết nối (homeUiState.cardInfo != null)
+        // - ID của người được chọn phải trùng với ID trong thẻ
+        val isCardOwner = homeUiState.cardInfo != null &&
+                homeUiState.cardInfo?.citizenId == selected.citizenId
+        println("isCardOwner: $isCardOwner, ${homeUiState.cardInfo}")
+
+        CitizenInfoDialog(
+            citizen = selected,
+            // 4. Truyền biến này vào Dialog để ẩn/hiện nút
+            showActions = isCardOwner,
+
+            onDismiss = { viewModel.closeCitizenDetail() },
+
+            // Các action gọi sang HomeViewModel để xử lý (vì HomeViewModel giữ kết nối thẻ)
+            onEditInfoClick = {
+//                viewModel.closeCitizenDetail()
+                homeViewModel.showEditInfoDialog(true)
+            },
+            onIntegratedDocumentClick = {
+//                viewModel.closeCitizenDetail()
+                homeViewModel.showIntegratedDocumentsDialog(true)
+            },
+            onPinChangeClick = {
+//                viewModel.closeCitizenDetail()
+                homeViewModel.showChangePinDialog(true)
+            },
+            onLockCardClick = {
+//                viewModel.closeCitizenDetail()
+                homeViewModel.isShowPinConfirmLockCardDialog(true)
+            },
+            onUnlockCardClick = {
+//                viewModel.closeCitizenDetail()
+                homeViewModel.isShowPinConfirmUnlockCardDialog(true)
+            }
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -168,7 +240,22 @@ fun ManageCitizenTabContent() {
                     items(uiState.citizens) { citizen ->
                         TableRowItem(
                             citizen = citizen,
-                            onEditClick = { },
+                            onClick = { viewModel.showCitizenDetail(citizen) },
+                            onEditClick = {
+                                val isCardOwner = homeUiState.cardInfo != null &&
+                                        homeUiState.cardInfo?.citizenId == citizen.citizenId
+
+                                if (isCardOwner) {
+                                    // 2. Gán dữ liệu vào HomeViewModel
+                                    homeViewModel.prepareForEdit(citizen)
+                                    // 3. Mở Dialog Edit của HomeViewModel
+                                    homeViewModel.showEditInfoDialog(true)
+                                } else {
+                                    // (Tùy chọn) Hiện thông báo yêu cầu kết nối đúng thẻ
+                                    homeViewModel.showNoticeDialog(true)
+                                    // Bạn có thể update message thông báo trong ViewModel nếu muốn
+                                }
+                            },
                             onDeleteClick = { viewModel.deleteCitizen(citizen.citizenId) }
                         )
                         HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
@@ -265,13 +352,14 @@ fun M3DropdownGender(
 @Composable
 fun TableRowItem(
     citizen: Citizen,
+    onClick: () -> Unit,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { /* Handle row click */ }
+            .clickable { onClick() }
             .padding(vertical = 12.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

@@ -17,7 +17,7 @@ val dataModule = module {
 }
 
 val viewModelModule = module {
-    viewModel { HomeViewModel(get(), get()) }
+    single { HomeViewModel(get(), get()) }
     viewModel { ManageCitizenViewModel(get()) }
 }
 
