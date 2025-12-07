@@ -74,6 +74,12 @@ fun MainScreen() {
                 },
                 onEditInfoClick = {
                     viewModel.showEditInfoDialog(true)
+                },
+                onLockCardClick = {
+                    viewModel.isShowPinConfirmLockCardDialog(true)
+                },
+                onUnlockCardClick = {
+                    viewModel.isShowPinConfirmUnlockCardDialog(true)
                 }
             )
 
@@ -84,7 +90,9 @@ fun MainScreen() {
                     uiState.isShowSetupPinDialog ||
                     uiState.isShowChangePinDialog ||
                     uiState.isShowEditInfoDialog ||
-                    uiState.isShowPinConfirmChangeInfoDialog
+                    uiState.isShowPinConfirmChangeInfoDialog ||
+                    uiState.isShowPinConfirmLockCardDialog ||
+                    uiState.isShowPinConfirmUnlockCardDialog
 
 
             AnimatedVisibility(
@@ -104,7 +112,10 @@ fun MainScreen() {
             // --- 1. PIN Dialog Animation (Spring Pop-up) ---
             // Hiệu ứng nảy (Bouncy) khi hiện ra
             AnimatedVisibility(
-                visible = uiState.isShowPinDialog || uiState.isShowPinConfirmChangeInfoDialog,
+                visible = uiState.isShowPinDialog
+                        || uiState.isShowPinConfirmChangeInfoDialog
+                        || uiState.isShowPinConfirmLockCardDialog
+                        || uiState.isShowPinConfirmUnlockCardDialog,
                 enter = fadeIn(tween(200)) + scaleIn(
                     initialScale = 0.8f,
                     animationSpec = spring(
@@ -114,7 +125,6 @@ fun MainScreen() {
                 ),
                 exit = fadeOut(tween(0)) + scaleOut(targetScale = 0.9f)
             ) {
-                // Để Dialog hiển thị chính giữa màn hình (nếu không dùng Window Dialog)
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     EnterPinDialog(
                         label = "Nhập mã pin (6 ký tự)",
@@ -125,6 +135,8 @@ fun MainScreen() {
                             when {
                                 uiState.isShowPinDialog -> viewModel.showPinDialog(false)
                                 uiState.isShowPinConfirmChangeInfoDialog -> viewModel.isShowPinConfirmDialog(false)
+                                uiState.isShowPinConfirmLockCardDialog -> viewModel.isShowPinConfirmLockCardDialog(false)
+                                uiState.isShowPinConfirmUnlockCardDialog -> viewModel.isShowPinConfirmUnlockCardDialog(false)
                             }
                         },
                         onClickRightBtn = { pinCode ->
@@ -132,6 +144,12 @@ fun MainScreen() {
                                 uiState.isShowPinDialog -> viewModel.connectCard(pinCode)
                                 uiState.isShowPinConfirmChangeInfoDialog -> {
                                     viewModel.updateCardInfo(pinCode)
+                                }
+                                uiState.isShowPinConfirmLockCardDialog -> {
+                                    viewModel.lockCard(pinCode)
+                                }
+                                uiState.isShowPinConfirmUnlockCardDialog -> {
+                                    viewModel.unlockCard(pinCode)
                                 }
                             }
                         }

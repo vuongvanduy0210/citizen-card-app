@@ -20,4 +20,6 @@ interface JavaCardRepository {
     fun disconnectCard()
     suspend fun changePin(oldPin: String, newPin: String): Boolean
     suspend fun updateCardInfo(citizen: Citizen): Boolean
+    suspend fun lockCard(): Boolean
+    suspend fun unlockCard(): Boolean
 }

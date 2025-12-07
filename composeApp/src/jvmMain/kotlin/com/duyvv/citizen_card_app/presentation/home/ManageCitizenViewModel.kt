@@ -73,7 +73,9 @@ data class ManageCitizenUIState(
     var filterName: String = "",
     var filterGender: String = "",
     var filterHometown: String = "",
-    var filterDob: String = ""
+    var filterDob: String = "",
+    val isShowDialogInfoCitizen: Boolean = false,
+    val selectedCitizen: Citizen? = null,
 ) : UiState {
     fun refresh() = copy(
         filterId = "",

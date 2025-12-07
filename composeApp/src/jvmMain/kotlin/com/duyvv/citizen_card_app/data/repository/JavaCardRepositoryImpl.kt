@@ -319,11 +319,12 @@ class JavaCardRepositoryImpl : JavaCardRepository {
     }
 
     override suspend fun changePin(oldPin: String, newPin: String): Boolean = withContext(Dispatchers.IO) {
-        when (val result = sendApdu(0x00, 0x03, 0x04, 0x00,stringToHexArray("$oldPin$$newPin"))) {
+        when (val result = sendApdu(0x00, 0x03, 0x04, 0x00, stringToHexArray("$oldPin$$newPin"))) {
             is ApduResult.Success -> {
                 println("change pin success! ${bytesToHex(result.response)}")
                 true
             }
+
             is ApduResult.Failed -> {
                 println("change pin failed! ${bytesToHex(result.response)}")
                 false
@@ -337,8 +338,37 @@ class JavaCardRepositoryImpl : JavaCardRepository {
                 println("Update data to card success: ${bytesToHex(result.response)}")
                 true
             }
+
             is ApduResult.Failed -> {
                 println("Update data to card failed: ${bytesToHex(result.response)}")
+                false
+            }
+        }
+    }
+
+    override suspend fun lockCard(): Boolean = withContext(Dispatchers.IO) {
+        when (val result = sendApdu(0x00, 0x03, 0x0C, 0x00, null)) {
+            is ApduResult.Success -> {
+                println("lock card success: ${bytesToHex(result.response)}")
+                true
+            }
+
+            is ApduResult.Failed -> {
+                println("lock card failed: ${bytesToHex(result.response)}")
+                false
+            }
+        }
+    }
+
+    override suspend fun unlockCard(): Boolean = withContext(Dispatchers.IO) {
+        when (val result = sendApdu(0x00, 0x03, 0x0B, 0x00, null)) {
+            is ApduResult.Success -> {
+                println("unlock card success: ${bytesToHex(result.response)}")
+                true
+            }
+
+            is ApduResult.Failed -> {
+                println("unlock card failed: ${bytesToHex(result.response)}")
                 false
             }
         }

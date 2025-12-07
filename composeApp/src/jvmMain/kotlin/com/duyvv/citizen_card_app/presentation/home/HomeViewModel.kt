@@ -240,7 +240,34 @@ class HomeViewModel(
                 }
             }
         }
+    }
 
+    fun lockCard(pinCode: String) {
+        verifyPinCard(pinCode) {
+            viewModelHandlerScope.launch {
+                val isSuccess = cardRepository.lockCard()
+                updateUiState {
+                    it.copy(
+                        isShowPinConfirmLockCardDialog = !isSuccess,
+                        isShowNoticeDialog = true,
+                        noticeMessage = if (isSuccess) "Khóa thẻ thành công!" else "Khóa thẻ thất bại!"
+                    )
+                }
+            }
+        }
+    }
+
+    fun unlockCard(pinCode: String) {
+        viewModelHandlerScope.launch {
+            val isSuccess = cardRepository.unlockCard()
+            updateUiState {
+                it.copy(
+                    isShowPinConfirmUnlockCardDialog = !isSuccess,
+                    isShowNoticeDialog = true,
+                    noticeMessage = if (isSuccess) "Mở khóa thẻ thành công!" else "Mở khóa thẻ thất bại!"
+                )
+            }
+        }
     }
 
     fun showPinDialog(isShow: Boolean) {
@@ -274,6 +301,14 @@ class HomeViewModel(
     fun isShowPinConfirmDialog(isShow: Boolean) {
         updateUiState { it.copy(isShowPinConfirmChangeInfoDialog = isShow) }
     }
+
+    fun isShowPinConfirmLockCardDialog(isShow: Boolean) {
+        updateUiState { it.copy(isShowPinConfirmLockCardDialog = isShow) }
+    }
+
+    fun isShowPinConfirmUnlockCardDialog(isShow: Boolean) {
+        updateUiState { it.copy(isShowPinConfirmUnlockCardDialog = isShow) }
+    }
 }
 
 data class HomeUIState(
@@ -288,6 +323,8 @@ data class HomeUIState(
     val errorMessage: String = "",
     val isShowEditInfoDialog: Boolean = false,
     val isShowPinConfirmChangeInfoDialog: Boolean = false,
+    val isShowPinConfirmLockCardDialog: Boolean = false,
+    val isShowPinConfirmUnlockCardDialog: Boolean = false,
 ) : UiState {
     fun reset() = copy(
         isShowPinDialog = false,
@@ -300,5 +337,7 @@ data class HomeUIState(
         errorMessage = "",
         isShowEditInfoDialog = false,
         isShowPinConfirmChangeInfoDialog = false,
+        isShowPinConfirmLockCardDialog = false,
+        isShowPinConfirmUnlockCardDialog = false
     )
 }
