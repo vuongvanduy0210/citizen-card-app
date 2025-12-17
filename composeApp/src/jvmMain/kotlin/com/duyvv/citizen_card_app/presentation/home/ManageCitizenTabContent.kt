@@ -21,7 +21,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.duyvv.citizen_card_app.data.local.entity.Citizen
 import com.duyvv.citizen_card_app.presentation.dialog.CitizenInfoDialog
 import com.duyvv.citizen_card_app.presentation.ui.theme.ColorHeaderBg
-import com.duyvv.citizen_card_app.presentation.ui.theme.ColorOrange
 import com.duyvv.citizen_card_app.presentation.ui.theme.ColorRed
 import com.duyvv.citizen_card_app.presentation.ui.theme.ColorTextPrimary
 import org.koin.compose.koinInject
@@ -35,6 +34,8 @@ fun ManageCitizenTabContent() {
     val homeViewModel = koinInject<HomeViewModel>()
     val uiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
     val homeUiState by homeViewModel.uiStateFlow.collectAsStateWithLifecycle()
+
+    val homeState by homeViewModel.uiStateFlow.collectAsStateWithLifecycle()
 
     LaunchedEffect(
         homeUiState.isShowEditInfoDialog,
@@ -105,7 +106,7 @@ fun ManageCitizenTabContent() {
             citizen = selected,
             // 4. Truyền biến này vào Dialog để ẩn/hiện nút
             showActions = isCardOwner,
-
+            isCardActive = homeUiState.isCardActive,
             onDismiss = { viewModel.closeCitizenDetail() },
 
             // Các action gọi sang HomeViewModel để xử lý (vì HomeViewModel giữ kết nối thẻ)
@@ -124,11 +125,11 @@ fun ManageCitizenTabContent() {
             },
             onLockCardClick = {
 //                viewModel.closeCitizenDetail()
-                homeViewModel.isShowPinConfirmLockCardDialog(true)
+                homeViewModel.lockCard("", true)
             },
             onUnlockCardClick = {
 //                viewModel.closeCitizenDetail()
-                homeViewModel.isShowPinConfirmUnlockCardDialog(true)
+                homeViewModel.unlockCard("", true)
             }
         )
     }

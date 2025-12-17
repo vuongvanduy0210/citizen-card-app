@@ -104,6 +104,7 @@ class HomeViewModel(
                     updateUiState {
                         it.copy(
                             isShowNoticeDialog = true,
+                            isCardActive = true,
                             noticeMessage = "Nhập sai mã pin! Còn $pinAttemptsRemain lần thử!"
                         )
                     }
@@ -111,7 +112,8 @@ class HomeViewModel(
                     updateUiState {
                         it.copy(
                             isShowNoticeDialog = true,
-                            noticeMessage = "Thẻ đã bị khoá do quá số lần sai cho phép!"
+                            isCardActive = false,
+                            noticeMessage = "Thẻ đã bị khoá vui lòng thử lại sau!"
                         )
                     }
                 }
@@ -269,29 +271,59 @@ class HomeViewModel(
         }
     }
 
-    fun lockCard(pinCode: String) {
-        verifyPinCard(pinCode) {
+    fun lockCard(pinCode: String, isFromAdmin: Boolean = false) {
+        if (isFromAdmin) {
             viewModelHandlerScope.launch {
-                val isSuccess = cardRepository.lockCard()
-                updateUiState {
-                    it.copy(
-                        isShowPinConfirmLockCardDialog = !isSuccess,
-                        isShowNoticeDialog = true,
-                        noticeMessage = if (isSuccess) "Khóa thẻ thành công!" else "Khóa thẻ thất bại!"
-                    )
+                lock(isFromAdmin)
+            }
+        } else {
+            verifyPinCard(pinCode) {
+                viewModelHandlerScope.launch {
+                    lock(isFromAdmin)
                 }
             }
         }
     }
 
-    fun unlockCard(pinCode: String) {
+    suspend fun lock(isFromAdmin: Boolean) {
+        val isSuccess = cardRepository.lockCard()
+        updateUiState {
+            it.copy(
+                isShowPinConfirmLockCardDialog = if (isFromAdmin) false else !isSuccess,
+                isShowNoticeDialog = true,
+                noticeMessage = if (isSuccess) {
+                    updateUiState { it.copy(isCardActive = false) }
+                    "Khóa thẻ thành công!"
+                } else {
+                    "Khóa thẻ thất bại!"
+                }
+            )
+        }
+    }
+
+    fun unlockCard(pinCode: String, isFromAdmin: Boolean = false) {
+        if (isFromAdmin) {
+            unlock(true)
+        } else {
+            verifyPinCard(pinCode) {
+                unlock(isFromAdmin)
+            }
+        }
+    }
+
+    fun unlock(isFromAdmin: Boolean) {
         viewModelHandlerScope.launch {
             val isSuccess = cardRepository.unlockCard()
             updateUiState {
                 it.copy(
-                    isShowPinConfirmUnlockCardDialog = !isSuccess,
+                    isShowPinConfirmUnlockCardDialog = if (isFromAdmin) false else !isSuccess,
                     isShowNoticeDialog = true,
-                    noticeMessage = if (isSuccess) "Mở khóa thẻ thành công!" else "Mở khóa thẻ thất bại!"
+                    noticeMessage = if (isSuccess) {
+                        updateUiState { it.copy(isCardActive = true) }
+                        "Mở khóa thẻ thành công!"
+                    } else {
+                        "Mở khóa thẻ thất bại!"
+                    }
                 )
             }
         }
@@ -453,7 +485,8 @@ data class HomeUIState(
     val isShowResetPinDialog: Boolean = false,
     val currentVehicle: VehicleRegister? = null,
     val currentLicense: DrivingLicense? = null,
-    val currentInsurance: HealthInsurance? = null
+    val currentInsurance: HealthInsurance? = null,
+    val isCardActive: Boolean = true
 ) : UiState {
     fun reset() = copy(
         isShowPinDialog = false,

@@ -139,7 +139,7 @@ fun MainScreen() {
                                 uiState.isShowPinConfirmChangeInfoDialog -> viewModel.isShowPinConfirmDialog(false)
                                 uiState.isShowPinConfirmLockCardDialog -> viewModel.isShowPinConfirmLockCardDialog(false)
                                 uiState.isShowPinConfirmUnlockCardDialog -> viewModel.isShowPinConfirmUnlockCardDialog(
-                                    false
+                                    false,
                                 )
                             }
                         },

@@ -31,6 +31,7 @@ import com.duyvv.citizen_card_app.presentation.ui.theme.ColorTextPrimary
 fun CitizenInfoDialog(
     citizen: Citizen,
     showActions: Boolean, // <--- THÊM THAM SỐ NÀY
+    isCardActive: Boolean,
     onDismiss: () -> Unit,
     onPinChangeClick: () -> Unit = {},
     onEditInfoClick: () -> Unit = {},
@@ -102,8 +103,11 @@ fun CitizenInfoDialog(
                             ActionButton("Đặt lại mã PIN", onPinChangeClick)
                             ActionButton("Chỉnh sửa", onEditInfoClick)
                             ActionButton("Giấy tờ tích hợp", onIntegratedDocumentClick)
-                            ActionButton("Khóa thẻ", onLockCardClick)
-                            ActionButton("Mở khóa thẻ", onUnlockCardClick)
+                            if (isCardActive) {
+                                ActionButton("Khóa thẻ", onLockCardClick)
+                            } else {
+                                ActionButton("Mở khóa thẻ", onUnlockCardClick)
+                            }
                         }
                     } else {
                         // (Tùy chọn) Hiển thị thông báo nhỏ nếu chỉ đang xem
