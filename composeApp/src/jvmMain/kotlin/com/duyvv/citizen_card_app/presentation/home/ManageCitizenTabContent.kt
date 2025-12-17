@@ -119,7 +119,8 @@ fun ManageCitizenTabContent() {
             },
             onPinChangeClick = {
 //                viewModel.closeCitizenDetail()
-                homeViewModel.showChangePinDialog(true)
+                homeViewModel.citizen = selected
+                homeViewModel.isShowResetPinDialog(true)
             },
             onLockCardClick = {
 //                viewModel.closeCitizenDetail()

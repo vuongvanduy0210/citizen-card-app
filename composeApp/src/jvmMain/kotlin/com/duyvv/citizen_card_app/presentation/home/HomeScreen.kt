@@ -93,7 +93,8 @@ fun MainScreen() {
                     uiState.isShowPinConfirmChangeInfoDialog ||
                     uiState.isShowPinConfirmLockCardDialog ||
                     uiState.isShowPinConfirmUnlockCardDialog ||
-                    uiState.isShowIntegratedDocumentsDialog
+                    uiState.isShowIntegratedDocumentsDialog ||
+                    uiState.isShowResetPinDialog
 
 
             AnimatedVisibility(
@@ -235,7 +236,7 @@ fun MainScreen() {
             }
 
             AnimatedVisibility(
-                visible = uiState.isShowSetupPinDialog,
+                visible = uiState.isShowSetupPinDialog || uiState.isShowResetPinDialog,
                 enter = fadeIn(tween(300)) + slideInVertically(
                     initialOffsetY = { it }, // Trượt từ đáy màn hình lên
                     animationSpec = spring(
@@ -253,9 +254,16 @@ fun MainScreen() {
                         isChangePin = false,
                         onDismiss = {
                             viewModel.showSetupPinDialog(false)
+                            viewModel.isShowResetPinDialog(false)
                         },
                         onConfirm = { _, newPin ->
-                            viewModel.citizen?.let { viewModel.setupPinCode(newPin, it) }
+                            viewModel.citizen?.let {
+                                if (uiState.isShowSetupPinDialog) {
+                                    viewModel.setupPinCode(newPin, it)
+                                } else if (uiState.isShowResetPinDialog) {
+                                    viewModel.resetPinCode(newPin, it)
+                                }
+                            }
                         }
                     )
                 }

@@ -252,6 +252,33 @@ class JavaCardRepositoryImpl : JavaCardRepository {
         }
     }
 
+    override suspend fun resetPinCode(
+        pinCode: String,
+        citizen: Citizen,
+        onResult: (Boolean, Citizen?, String?) -> Unit
+    ) {
+        println("resetPinCode=====>" + bytesToHex(stringToHexArray(citizen.toCardInfo() + "$" + pinCode)))
+        val formattedDate = SimpleDateFormat("dd/MM/yyyy").format(Date())
+        val data = stringToHexArray("${citizen.toCardInfo()}$${formattedDate}$${pinCode}")
+        when (val result = sendApdu(0x00, 0x01, 0x05, 0x00, data)) {
+            is ApduResult.Success -> {
+                ApplicationState.setCardInserted(true)
+                ApplicationState.setCardVerified(true)
+                val publicKey = bytesToHex(result.response)
+                println("resetPinCode=====>publicKey: $publicKey")
+                citizen.avatar?.let {
+                    sendAvatar(it)
+                }
+                onResult(true, citizen, publicKey)
+            }
+
+            is ApduResult.Failed -> {
+                println("setupPinCode=====>failed")
+                onResult(false, null, null)
+            }
+        }
+    }
+
     override suspend fun sendAvatar(avatar: ByteArray?): Boolean {
         return when (sendApdu(0x00, 0x03, 0x05, 0x09, avatar)) {
             is ApduResult.Success -> {

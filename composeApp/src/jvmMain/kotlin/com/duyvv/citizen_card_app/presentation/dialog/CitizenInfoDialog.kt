@@ -99,7 +99,7 @@ fun CitizenInfoDialog(
                             horizontalArrangement = Arrangement.spacedBy(15.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            ActionButton("Đổi mã PIN", onPinChangeClick)
+                            ActionButton("Đặt lại mã PIN", onPinChangeClick)
                             ActionButton("Chỉnh sửa", onEditInfoClick)
                             ActionButton("Giấy tờ tích hợp", onIntegratedDocumentClick)
                             ActionButton("Khóa thẻ", onLockCardClick)

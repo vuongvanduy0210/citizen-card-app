@@ -148,15 +148,39 @@ class HomeViewModel(
         }
     }
 
-    fun updateCitizenLocal(citizen: Citizen, publicKey: String) {
+    fun resetPinCode(pinCode: String, citizen: Citizen) {
         viewModelHandlerScope.launch {
-            val isInsertSuccess = dataRepository.insertCitizen(citizen)
+            println("resetPinCode11111: ")
+            cardRepository.resetPinCode(pinCode, citizen) { isSuccess, newCitizen, publicKey ->
+                println("resetPinCode: $isSuccess, $newCitizen, $publicKey")
+                if (isSuccess && newCitizen != null && publicKey != null) {
+                    updateCitizenLocal(newCitizen, publicKey, true)
+                } else {
+                    updateUiState {
+                        it.copy(
+                            isShowNoticeDialog = true,
+                            noticeMessage = "Thiết lập thông tin thất bại, vui lòng thử lại!"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun updateCitizenLocal(citizen: Citizen, publicKey: String, isUpdate: Boolean = false) {
+        viewModelHandlerScope.launch {
+            val isInsertSuccess = if (isUpdate) {
+                dataRepository.updateCitizen(citizen)
+            } else {
+                dataRepository.insertCitizen(citizen)
+            }
             val isSetPublicKeySuccess = dataRepository.updatePublicKey(citizen.citizenId, publicKey)
             if (isInsertSuccess && isSetPublicKeySuccess) {
                 updateUiState {
                     it.copy(
                         isShowNoticeDialog = true,
                         isShowSetupPinDialog = false,
+                        isShowResetPinDialog = false,
                         noticeMessage = "Thiết lập mã PIN thành công!"
                     )
                 }
@@ -366,6 +390,10 @@ class HomeViewModel(
         updateUiState { it.copy(isShowPinConfirmUnlockCardDialog = isShow) }
     }
 
+    fun isShowResetPinDialog(isShow: Boolean) {
+        updateUiState { it.copy(isShowResetPinDialog = isShow) }
+    }
+
     fun showIntegratedDocumentsDialog(isShow: Boolean) {
         if (isShow) {
             val currentCitizenId = uiStateFlow.value.cardInfo?.citizenId
@@ -422,6 +450,7 @@ data class HomeUIState(
     val isShowPinConfirmLockCardDialog: Boolean = false,
     val isShowPinConfirmUnlockCardDialog: Boolean = false,
     val isShowIntegratedDocumentsDialog: Boolean = false,
+    val isShowResetPinDialog: Boolean = false,
     val currentVehicle: VehicleRegister? = null,
     val currentLicense: DrivingLicense? = null,
     val currentInsurance: HealthInsurance? = null
@@ -439,6 +468,7 @@ data class HomeUIState(
         isShowPinConfirmChangeInfoDialog = false,
         isShowPinConfirmLockCardDialog = false,
         isShowPinConfirmUnlockCardDialog = false,
-        isShowIntegratedDocumentsDialog = false
+        isShowIntegratedDocumentsDialog = false,
+        isShowResetPinDialog = false,
     )
 }
