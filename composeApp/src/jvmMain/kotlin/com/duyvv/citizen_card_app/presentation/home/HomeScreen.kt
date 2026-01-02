@@ -236,33 +236,35 @@ fun MainScreen() {
             }
 
             AnimatedVisibility(
-                visible = uiState.isShowSetupPinDialog || uiState.isShowResetPinDialog,
-                enter = fadeIn(tween(300)) + slideInVertically(
-                    initialOffsetY = { it }, // Trượt từ đáy màn hình lên
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessLow
-                    )
-                ),
-                exit = fadeOut(tween(200)) + slideOutVertically(
-                    targetOffsetY = { it },
-                    animationSpec = tween(200)
-                )
+                visible = uiState.isShowSetupPinDialog, // BỎ isShowResetPinDialog ở đây
+                enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { it }, animationSpec = spring(stiffness = Spring.StiffnessLow)),
+                exit = fadeOut(tween(200)) + slideOutVertically(targetOffsetY = { it }, animationSpec = tween(200))
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     ChangePinDialog(
                         isChangePin = false,
-                        onDismiss = {
-                            viewModel.showSetupPinDialog(false)
-                            viewModel.isShowResetPinDialog(false)
-                        },
+                        onDismiss = { viewModel.showSetupPinDialog(false) },
                         onConfirm = { _, newPin ->
                             viewModel.citizen?.let {
-                                if (uiState.isShowSetupPinDialog) {
-                                    viewModel.setupPinCode(newPin, it)
-                                } else if (uiState.isShowResetPinDialog) {
-                                    viewModel.resetPinCode(newPin)
-                                }
+                                viewModel.setupPinCode(newPin, it)
+                            }
+                        }
+                    )
+                }
+            }
+
+            // 2. Admin Reset PIN Dialog (THÊM MỚI - Dùng Dialog mới tạo)
+            AnimatedVisibility(
+                visible = uiState.isShowResetPinDialog,
+                enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { it }, animationSpec = spring(stiffness = Spring.StiffnessLow)),
+                exit = fadeOut(tween(200)) + slideOutVertically(targetOffsetY = { it }, animationSpec = tween(200))
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    AdminResetPinDialog(
+                        onDismiss = { viewModel.isShowResetPinDialog(false) },
+                        onConfirm = { puk, newPin ->
+                            viewModel.citizen?.let {
+                                viewModel.resetPinCode(puk, newPin)
                             }
                         }
                     )

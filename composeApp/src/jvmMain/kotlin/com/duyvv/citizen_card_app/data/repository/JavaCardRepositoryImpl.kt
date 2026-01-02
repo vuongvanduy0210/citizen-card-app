@@ -252,9 +252,8 @@ class JavaCardRepositoryImpl : JavaCardRepository {
         }
     }
 
-    override suspend fun resetPinCode(pinCode: String): Boolean = withContext(Dispatchers.IO) {
-        val defaultPuk = "12345678"
-        resetPinByAdmin(defaultPuk, pinCode)
+    override suspend fun resetPinCode(adminPin: String, pinCode: String): Boolean = withContext(Dispatchers.IO) {
+        resetPinByAdmin(adminPin, pinCode)
     }
 
     override suspend fun sendAvatar(avatar: ByteArray?): Boolean {

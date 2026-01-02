@@ -150,10 +150,10 @@ class HomeViewModel(
         }
     }
 
-    fun resetPinCode(pinCode: String) {
+    fun resetPinCode(adminPin: String, pinCode: String) {
         viewModelHandlerScope.launch {
             println("resetPinCode11111: ")
-            val isSuccess = cardRepository.resetPinCode(pinCode)
+            val isSuccess = cardRepository.resetPinCode(adminPin, pinCode)
             if (isSuccess) {
                 updateUiState {
                     it.copy(
@@ -205,22 +205,24 @@ class HomeViewModel(
     }
 
     fun changePin(oldPin: String, newPin: String) {
-        viewModelHandlerScope.launch {
-            val isSuccess = cardRepository.changePin(oldPin, newPin)
-            if (isSuccess) {
-                updateUiState {
-                    it.copy(
-                        isShowNoticeDialog = true,
-                        isShowChangePinDialog = false,
-                        noticeMessage = "Thay đổi mã pin thành công!"
-                    )
-                }
-            } else {
-                updateUiState {
-                    it.copy(
-                        isShowNoticeDialog = true,
-                        noticeMessage = "Thay đổi mã pin thất bại, vui lòng thử lại!"
-                    )
+        verifyPinCard(oldPin) {
+            viewModelHandlerScope.launch {
+                val isSuccess = cardRepository.changePin(oldPin, newPin)
+                if (isSuccess) {
+                    updateUiState {
+                        it.copy(
+                            isShowNoticeDialog = true,
+                            isShowChangePinDialog = false,
+                            noticeMessage = "Thay đổi mã pin thành công!"
+                        )
+                    }
+                } else {
+                    updateUiState {
+                        it.copy(
+                            isShowNoticeDialog = true,
+                            noticeMessage = "Thay đổi mã pin thất bại, vui lòng thử lại!"
+                        )
+                    }
                 }
             }
         }
@@ -577,7 +579,12 @@ class HomeViewModel(
                 // QUAN TRỌNG: Gọi hàm load lại để UI (List và Dialog) nhận dữ liệu mới nhất từ thẻ
                 loadLicensesFromCard()
             } else {
-                updateUiState { it.copy(isShowNoticeDialog = true, noticeMessage = "Lỗi kết nối thẻ hoặc sai vị trí bằng lái!") }
+                updateUiState {
+                    it.copy(
+                        isShowNoticeDialog = true,
+                        noticeMessage = "Lỗi kết nối thẻ hoặc sai vị trí bằng lái!"
+                    )
+                }
             }
         }
     }
@@ -592,7 +599,12 @@ class HomeViewModel(
                 val sampleData = "123456|A1|20/10/2030"
                 // Gửi setup với Count = 1 (P2 = 1) để thẻ biết khởi tạo 12 điểm cho 1 bằng
                 if (cardRepository.setupMultiLicenses(sampleData, 1)) {
-                    updateUiState { it.copy(isShowNoticeDialog = true, noticeMessage = "Đã nạp dữ liệu mẫu (12 điểm)!") }
+                    updateUiState {
+                        it.copy(
+                            isShowNoticeDialog = true,
+                            noticeMessage = "Đã nạp dữ liệu mẫu (12 điểm)!"
+                        )
+                    }
                     loadLicensesFromCard()
                 }
                 return@launch
@@ -604,13 +616,18 @@ class HomeViewModel(
                 val joinedStr = dbLicenses.joinToString("#") { "${it.licenseId}|${it.licenseLevel}|${it.expiredAt}" }
                 // Gửi đúng số lượng (dbLicenses.size) vào P2
                 if (cardRepository.setupMultiLicenses(joinedStr, dbLicenses.size)) {
-                    updateUiState { it.copy(isShowNoticeDialog = true, noticeMessage = "Đã Reset thẻ theo dữ liệu DB!") }
+                    updateUiState {
+                        it.copy(
+                            isShowNoticeDialog = true,
+                            noticeMessage = "Đã Reset thẻ theo dữ liệu DB!"
+                        )
+                    }
                     loadLicensesFromCard()
                 }
             } else {
                 // DB trống => Nạp mẫu
                 val sampleData = "SAMPLE|A1|2030"
-                if(cardRepository.setupMultiLicenses(sampleData, 1)) {
+                if (cardRepository.setupMultiLicenses(sampleData, 1)) {
                     loadLicensesFromCard()
                 }
             }
@@ -623,7 +640,12 @@ class HomeViewModel(
         viewModelHandlerScope.launch {
             val success = cardRepository.resetLicenseByIndex(currentItem.index)
             if (success) {
-                updateUiState { it.copy(isShowNoticeDialog = true, noticeMessage = "Đã khôi phục 12 điểm cho bằng lái này!") }
+                updateUiState {
+                    it.copy(
+                        isShowNoticeDialog = true,
+                        noticeMessage = "Đã khôi phục 12 điểm cho bằng lái này!"
+                    )
+                }
                 loadLicensesFromCard() // Load lại để cập nhật UI
             } else {
                 updateUiState { it.copy(isShowNoticeDialog = true, noticeMessage = "Lỗi khi reset!") }

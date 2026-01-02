@@ -16,7 +16,7 @@ interface JavaCardRepository {
         onResult: (Boolean, Citizen?, String?) -> Unit
     )
 
-    suspend fun resetPinCode(pinCode: String) : Boolean
+    suspend fun resetPinCode(adminPin: String, pinCode: String) : Boolean
 
     suspend fun sendAvatar(avatar: ByteArray?): Boolean
     fun disconnectCard()
