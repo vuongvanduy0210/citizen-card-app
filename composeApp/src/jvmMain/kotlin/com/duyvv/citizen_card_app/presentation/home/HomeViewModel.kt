@@ -388,7 +388,7 @@ class HomeViewModel(
 
         // Gửi lệnh Setup (Sẽ reset điểm về 12 cho danh sách mới)
         // Lưu ý: Đảm bảo Repository đã có hàm setupMultiLicenses
-        val success = cardRepository.setupMultiLicenses(joinedString, licenses.size)
+        val success = cardRepository.setupMultiLicenses(joinedString, licenses.size, keepOldScores = true)
 
         if (success) {
             updateUiState {

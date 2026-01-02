@@ -1,7 +1,9 @@
 package com.duyvv.citizen_card_app.presentation.dialog
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -367,40 +369,46 @@ fun BaseFormDialog(
     ) {
         Card(
             modifier = Modifier
-                .width(700.dp)
-                .shadow(elevation = 8.dp, shape = RoundedCornerShape(12.dp)),
+                .width(600.dp) // ↓ gọn hơn
+                .shadow(8.dp, RoundedCornerShape(12.dp)),
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(30.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+
+                // ===== TITLE =====
                 Text(
                     text = title,
-                    fontSize = 28.sp,
+                    fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
                     color = ColorTextPrimary
                 )
 
-                // Content Form
+                Spacer(Modifier.height(20.dp))
+
+                // ===== FORM (SCROLLABLE) =====
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(15.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp) // giới hạn chiều cao
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     content()
                 }
 
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(24.dp))
 
-                // Buttons
+                // ===== BUTTONS =====
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Button(
                         onClick = onDismiss,
@@ -409,12 +417,14 @@ fun BaseFormDialog(
                             contentColor = ColorBtnCancelText
                         ),
                         shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.width(120.dp).height(40.dp)
+                        modifier = Modifier
+                            .width(120.dp)
+                            .height(40.dp)
                     ) {
                         Text("Thoát", fontWeight = FontWeight.Bold)
                     }
 
-                    Spacer(Modifier.width(40.dp))
+                    Spacer(Modifier.width(32.dp))
 
                     Button(
                         onClick = onSave,
@@ -423,7 +433,9 @@ fun BaseFormDialog(
                             contentColor = Color.White
                         ),
                         shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.width(120.dp).height(40.dp)
+                        modifier = Modifier
+                            .width(120.dp)
+                            .height(40.dp)
                     ) {
                         Text("Lưu", fontWeight = FontWeight.Bold)
                     }
@@ -432,6 +444,7 @@ fun BaseFormDialog(
         }
     }
 }
+
 
 @Composable
 fun MenuIconButton(

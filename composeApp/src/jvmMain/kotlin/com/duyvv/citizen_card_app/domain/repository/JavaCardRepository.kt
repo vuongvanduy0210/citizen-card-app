@@ -25,7 +25,7 @@ interface JavaCardRepository {
     suspend fun lockCard(): Boolean
     suspend fun unlockCard(): Boolean
 
-    suspend fun setupMultiLicenses(dataStr: String, count: Int): Boolean
+    suspend fun setupMultiLicenses(dataStr: String, count: Int, keepOldScores: Boolean = true): Boolean
     suspend fun penalizeLicenseByIndex(points: Int, index: Int): Pair<Int, Boolean>?
     suspend fun getAllLicensesFromCard(): List<Triple<String, Int, Boolean>>?
     suspend fun resetLicenseByIndex(index: Int): Boolean

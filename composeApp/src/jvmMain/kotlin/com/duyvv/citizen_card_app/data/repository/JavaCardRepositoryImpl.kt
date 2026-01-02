@@ -401,11 +401,16 @@ class JavaCardRepositoryImpl : JavaCardRepository {
         return String(byteArray, Charsets.UTF_8)
     }
 
-    override suspend fun setupMultiLicenses(dataStr: String, count: Int): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun setupMultiLicenses(dataStr: String, count: Int, keepOldScores: Boolean): Boolean = withContext(Dispatchers.IO) {
         val dataBytes = stringToHexArray(dataStr)
-        // Gửi lệnh 0x20, P2 = Số lượng bằng
-        // dataStr dạng: "ID1|A1|Date1#ID2|B2|Date2"
-        when (val result = sendApdu(0x00, 0x20, 0x00, count, dataBytes)) {
+
+        // Xác định P1:
+        // P1 = 0x01: Nếu keepOldScores = true (Chế độ đồng bộ)
+        // P1 = 0x00: Nếu keepOldScores = false (Chế độ reset)
+        val p1 = if (keepOldScores) 0x01 else 0x00
+
+        // Gửi lệnh 0x20 với P1 đã chọn
+        when (val result = sendApdu(0x00, 0x20, p1, count, dataBytes)) {
             is ApduResult.Success -> true
             is ApduResult.Failed -> false
         }
