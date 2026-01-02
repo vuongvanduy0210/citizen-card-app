@@ -341,14 +341,64 @@ class HomeViewModel(
         }
     }
 
+    // --- SỬA LẠI HÀM LƯU BẰNG LÁI (saveDrivingLicense) ---
+    // (Tìm hàm cũ và thay bằng nội dung này)
     fun saveDrivingLicense(license: DrivingLicense) {
         viewModelHandlerScope.launch {
+            // B1: Lưu vào DB Local
             val success = dataRepository.saveDrivingLicense(license)
-            showNoticeResult(success, "Lưu giấy phép lái xe")
 
-            // --- THÊM DÒNG NÀY ---
             if (success) {
+                // B2: Tải lại dữ liệu cho dialog
                 loadIntegratedDocuments(license.citizenId)
+
+                // B3: Nếu thẻ đang kết nối -> Đồng bộ toàn bộ danh sách xuống thẻ
+                if (uiStateFlow.value.isCardActive) {
+                    syncAllLicensesToCard(license.citizenId)
+                } else {
+                    updateUiState {
+                        it.copy(
+                            isShowNoticeDialog = true,
+                            noticeMessage = "Đã lưu vào máy! (Chưa đồng bộ thẻ do chưa kết nối)"
+                        )
+                    }
+                }
+            } else {
+                updateUiState { it.copy(isShowNoticeDialog = true, noticeMessage = "Lưu thất bại!") }
+            }
+        }
+    }
+
+    // 2. THÊM MỚI hàm này (để hàm trên gọi được)
+    // Nhiệm vụ: Lấy hết bằng lái từ DB -> Gộp chuỗi -> Gửi xuống thẻ
+    private suspend fun syncAllLicensesToCard(citizenId: String) {
+        // Lấy danh sách mới nhất từ DB
+        val licenses = dataRepository.getDrivingLicenseByCitizenId(citizenId)
+
+        // Tạo chuỗi gộp: "ID1|A1|Date # ID2|B2|Date"
+        val joinedString = licenses.joinToString("#") {
+            "${it.licenseId}|${it.licenseLevel}|${it.expiredAt}"
+        }
+
+        // Gửi lệnh Setup (Sẽ reset điểm về 12 cho danh sách mới)
+        // Lưu ý: Đảm bảo Repository đã có hàm setupMultiLicenses
+        val success = cardRepository.setupMultiLicenses(joinedString, licenses.size)
+
+        if (success) {
+            updateUiState {
+                it.copy(
+                    isShowNoticeDialog = true,
+                    noticeMessage = "Đã lưu DB và đồng bộ danh sách xuống thẻ!"
+                )
+            }
+            // Load lại từ thẻ để hiển thị lên giao diện
+            loadLicensesFromCard()
+        } else {
+            updateUiState {
+                it.copy(
+                    isShowNoticeDialog = true,
+                    noticeMessage = "Lưu DB thành công nhưng LỖI đồng bộ thẻ!"
+                )
             }
         }
     }
@@ -465,6 +515,124 @@ class HomeViewModel(
             }
         }
     }
+
+    fun loadLicensesFromCard() {
+        viewModelHandlerScope.launch {
+            val result = cardRepository.getAllLicensesFromCard()
+
+            if (result != null) {
+                val uiItems = result.mapIndexed { index, (text, score, isRevoked) ->
+                    // --- FIX LOGIC: Nếu 0 điểm thì coi như KHÓA luôn ---
+                    val finalIsRevoked = isRevoked || score == 0
+                    LicenseUiItem(index, text, score, finalIsRevoked)
+                }
+
+                // Cập nhật State
+                updateUiState { currentState ->
+                    // --- ĐỒNG BỘ DATA CHO DIALOG ---
+                    // Nếu đang mở Dialog, phải lấy dữ liệu mới nhất đắp vào selectedLicense
+                    var updatedSelected = currentState.selectedLicense
+                    if (updatedSelected != null) {
+                        // Tìm item có cùng index trong danh sách mới tải về
+                        val freshItem = uiItems.find { it.index == updatedSelected?.index }
+                        if (freshItem != null) {
+                            updatedSelected = freshItem
+                        }
+                    }
+
+                    currentState.copy(
+                        cardLicenses = uiItems,
+                        selectedLicense = updatedSelected // Cập nhật biến này thì UI Dialog mới đổi
+                    )
+                }
+            } else {
+                updateUiState { it.copy(cardLicenses = emptyList()) }
+            }
+        }
+    }
+
+    // 2. Trừ điểm (Gửi lệnh phạt -> Load lại ngay lập tức)
+    fun deductPoints(points: Int) {
+        val currentItem = uiStateFlow.value.selectedLicense ?: return
+
+        viewModelHandlerScope.launch {
+            // Gửi lệnh xuống thẻ (P1=Điểm, P2=Index)
+            val result = cardRepository.penalizeLicenseByIndex(points, currentItem.index)
+
+            if (result != null) {
+                val (newScore, isRevoked) = result
+
+                // Show thông báo tạm
+                val isRevokedSafe = isRevoked || newScore == 0
+
+                val msg = if (isRevokedSafe) "Đã tước bằng lái!" else "Trừ thành công. Còn $newScore điểm."
+                updateUiState { it.copy(isShowNoticeDialog = true, noticeMessage = msg) }
+
+                // QUAN TRỌNG: Gọi hàm load lại để UI (List và Dialog) nhận dữ liệu mới nhất từ thẻ
+                loadLicensesFromCard()
+            } else {
+                updateUiState { it.copy(isShowNoticeDialog = true, noticeMessage = "Lỗi kết nối thẻ hoặc sai vị trí bằng lái!") }
+            }
+        }
+    }
+
+    // 3. Hàm Setup/Reset (Sửa lỗi 0 điểm do sai P2)
+    // Hàm này thay thế cho setupSampleLicense cũ
+    fun resetScoreForTest() {
+        viewModelHandlerScope.launch {
+            val cid = uiStateFlow.value.cardInfo?.citizenId
+            if (cid == null) {
+                // Nếu chưa có info, thử tạo dữ liệu mẫu
+                val sampleData = "123456|A1|20/10/2030"
+                // Gửi setup với Count = 1 (P2 = 1) để thẻ biết khởi tạo 12 điểm cho 1 bằng
+                if (cardRepository.setupMultiLicenses(sampleData, 1)) {
+                    updateUiState { it.copy(isShowNoticeDialog = true, noticeMessage = "Đã nạp dữ liệu mẫu (12 điểm)!") }
+                    loadLicensesFromCard()
+                }
+                return@launch
+            }
+
+            // Nếu có info, lấy từ DB nạp xuống
+            val dbLicenses = dataRepository.getDrivingLicenseByCitizenId(cid)
+            if (dbLicenses.isNotEmpty()) {
+                val joinedStr = dbLicenses.joinToString("#") { "${it.licenseId}|${it.licenseLevel}|${it.expiredAt}" }
+                // Gửi đúng số lượng (dbLicenses.size) vào P2
+                if (cardRepository.setupMultiLicenses(joinedStr, dbLicenses.size)) {
+                    updateUiState { it.copy(isShowNoticeDialog = true, noticeMessage = "Đã Reset thẻ theo dữ liệu DB!") }
+                    loadLicensesFromCard()
+                }
+            } else {
+                // DB trống => Nạp mẫu
+                val sampleData = "SAMPLE|A1|2030"
+                if(cardRepository.setupMultiLicenses(sampleData, 1)) {
+                    loadLicensesFromCard()
+                }
+            }
+        }
+    }
+
+    fun resetCurrentLicense() {
+        val currentItem = uiStateFlow.value.selectedLicense ?: return
+
+        viewModelHandlerScope.launch {
+            val success = cardRepository.resetLicenseByIndex(currentItem.index)
+            if (success) {
+                updateUiState { it.copy(isShowNoticeDialog = true, noticeMessage = "Đã khôi phục 12 điểm cho bằng lái này!") }
+                loadLicensesFromCard() // Load lại để cập nhật UI
+            } else {
+                updateUiState { it.copy(isShowNoticeDialog = true, noticeMessage = "Lỗi khi reset!") }
+            }
+        }
+    }
+
+    // Các hàm điều khiển Dialog
+    fun selectLicenseAndShowDetail(item: LicenseUiItem) {
+        updateUiState { it.copy(selectedLicense = item, isShowLicenseDetailDialog = true) }
+    }
+
+    fun dismissLicenseDetail() {
+        updateUiState { it.copy(isShowLicenseDetailDialog = false, selectedLicense = null) }
+    }
 }
 
 data class HomeUIState(
@@ -486,22 +654,22 @@ data class HomeUIState(
     val currentVehicle: VehicleRegister? = null,
     val currentLicense: DrivingLicense? = null,
     val currentInsurance: HealthInsurance? = null,
-    val isCardActive: Boolean = true
+    val isCardActive: Boolean = true,
+    val cardLicenses: List<LicenseUiItem> = emptyList(), // Danh sách hiển thị
+    val selectedLicense: LicenseUiItem? = null,          // Item đang chọn
+    val isShowLicenseDetailDialog: Boolean = false,      // Cờ hiện dialog
+    val dbLicenses: List<DrivingLicense> = emptyList()
 ) : UiState {
-    fun reset() = copy(
-        isShowPinDialog = false,
-        isShowErrorPinCodeDialog = false,
-        isShowNoticeDialog = false,
-        noticeMessage = "",
-        isCreateInfoDialog = false,
-        isShowChangePinDialog = false,
-        cardInfo = null,
-        errorMessage = "",
-        isShowEditInfoDialog = false,
-        isShowPinConfirmChangeInfoDialog = false,
-        isShowPinConfirmLockCardDialog = false,
-        isShowPinConfirmUnlockCardDialog = false,
-        isShowIntegratedDocumentsDialog = false,
-        isShowResetPinDialog = false,
-    )
+    fun reset() = HomeUIState()
 }
+
+// --- THÊM MỚI ---
+data class LicenseUiItem(
+    val index: Int,
+    val rawData: String,
+    val score: Int,
+    val isRevoked: Boolean,
+    val licenseId: String = rawData.split("|").getOrElse(0) { "" },
+    val rank: String = rawData.split("|").getOrElse(1) { "" },
+    val expiration: String = rawData.split("|").getOrElse(2) { "" }
+)

@@ -422,4 +422,114 @@ class JavaCardRepositoryImpl : JavaCardRepository {
             .toByteArray()                          // Gom lại thành mảng ByteArray
         return String(byteArray, Charsets.UTF_8)
     }
+
+    override suspend fun setupMultiLicenses(dataStr: String, count: Int): Boolean = withContext(Dispatchers.IO) {
+        val dataBytes = stringToHexArray(dataStr)
+        // Gửi lệnh 0x20, P2 = Số lượng bằng
+        // dataStr dạng: "ID1|A1|Date1#ID2|B2|Date2"
+        when (val result = sendApdu(0x00, 0x20, 0x00, count, dataBytes)) {
+            is ApduResult.Success -> true
+            is ApduResult.Failed -> false
+        }
+    }
+
+    override suspend fun penalizeLicenseByIndex(points: Int, index: Int): Pair<Int, Boolean>? = withContext(Dispatchers.IO) {
+        // Log xem mình gửi cái gì đi
+        println("Sending Penalize: Points=$points, Index=$index")
+
+        // Gửi lệnh 0x22, P1 = Điểm, P2 = Index
+        when (val result = sendApdu(0x00, 0x22, points, index, null)) {
+            is ApduResult.Success -> {
+                val resp = result.response ?: return@withContext null
+
+                // --- LOG DEBUG QUAN TRỌNG ---
+                // Hãy xem logcat hiện gì.
+                // Nếu hiện "Response Hex: 00 01" nghĩa là 0 điểm, bị khóa.
+                // Nếu hiện "Response Hex: 0C 00" nghĩa là 12 điểm, mở.
+                val hexString = resp.joinToString(" ") { "%02X".format(it) }
+                println("Card Response Hex: $hexString")
+                // -----------------------------
+
+                // Trả về: [Score] [Status]
+                if (resp.size >= 2) {
+                    // SỬA LẠI: Dùng toInt() and 0xFF để đảm bảo lấy đúng số dương
+                    val score = resp[0].toInt() and 0xFF
+                    val statusByte = resp[1].toInt() and 0xFF
+
+                    // Status: 1 là Khóa (Revoked), 0 là Mở
+                    val isRevoked = (statusByte == 1)
+
+                    println("Parsed Result: Score=$score, isRevoked=$isRevoked")
+
+                    Pair(score, isRevoked)
+                } else {
+                    println("Error: Response length too short (<2 bytes)")
+                    null
+                }
+            }
+            is ApduResult.Failed -> {
+                println("Error: Send APDU Failed - ${result.message}")
+                null
+            }
+        }
+    }
+    // 3. Lấy toàn bộ danh sách từ thẻ
+    override suspend fun getAllLicensesFromCard(): List<Triple<String, Int, Boolean>>? = withContext(Dispatchers.IO) {
+        // Gửi lệnh 0x21
+        val result = sendApdu(0x00, 0x21, 0x00, 0x00, null)
+        if (result !is ApduResult.Success) return@withContext null
+
+        val resp = result.response ?: return@withContext null
+
+        // Tìm vị trí byte ngăn cách 0xFF (duyệt ngược từ cuối để an toàn)
+        var sepIndex = -1
+        for (i in resp.indices.reversed()) {
+            if (resp[i] == 0xFF.toByte()) {
+                sepIndex = i
+                break
+            }
+        }
+        if (sepIndex == -1) return@withContext null
+
+        // A. Parse phần Text (Info1#Info2...)
+        // Copy từ 0 đến sepIndex
+        val textBytes = resp.copyOfRange(0, sepIndex)
+        val fullText = String(textBytes, Charsets.UTF_8)
+
+        // Nếu chuỗi rỗng thì trả về list rỗng
+        if (fullText.isEmpty()) return@withContext emptyList()
+
+        val textParts = fullText.split("#") // Tách chuỗi dựa trên dấu #
+
+        // B. Parse phần Metadata (Count | Score1 Status1 | Score2 Status2...)
+        // Byte tại sepIndex là 0xFF
+        // Byte tại sepIndex + 1 là Count
+        if (sepIndex + 1 >= resp.size) return@withContext emptyList()
+
+        val count = resp[sepIndex + 1].toInt()
+        val resultList = mutableListOf<Triple<String, Int, Boolean>>()
+
+        var ptr = sepIndex + 2 // Con trỏ bắt đầu đọc điểm
+        for (i in 0 until count) {
+            // Đảm bảo không đọc vượt quá mảng text hoặc mảng byte response
+            if (i >= textParts.size || ptr + 1 >= resp.size) break
+
+            val score = resp[ptr].toInt()
+            val isRevoked = resp[ptr + 1].toInt() == 1
+
+            resultList.add(Triple(textParts[i], score, isRevoked))
+
+            ptr += 2 // Nhảy 2 byte (1 byte Score + 1 byte Status) cho lần lặp sau
+        }
+
+        return@withContext resultList
+    }
+
+    override suspend fun resetLicenseByIndex(index: Int): Boolean = withContext(Dispatchers.IO) {
+        // Gửi lệnh 0x23, P2 = index
+        when (val result = sendApdu(0x00, 0x23, 0x00, index, null)) {
+            is ApduResult.Success -> true
+            is ApduResult.Failed -> false
+        }
+    }
 }

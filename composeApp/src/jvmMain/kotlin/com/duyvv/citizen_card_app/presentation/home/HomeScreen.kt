@@ -402,6 +402,11 @@ fun SystemManagerApp(
                     onClick = { selectedTabIndex = 1 },
                     text = "👥 Danh sách công dân"
                 )
+                TabItem(
+                    selected = selectedTabIndex == 2,
+                    onClick = { selectedTabIndex = 2 },
+                    text = "🚗 Bằng lái xe"
+                )
             }
 
             // --- TAB CONTENT ---
@@ -419,6 +424,8 @@ fun SystemManagerApp(
                     )
 
                     1 -> ManageCitizenTabContent()
+
+                    2 -> DrivingLicenseTabContent(isCardConnected = isCardConnected)
                 }
             }
         }
