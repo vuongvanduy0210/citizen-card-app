@@ -16,11 +16,7 @@ interface JavaCardRepository {
         onResult: (Boolean, Citizen?, String?) -> Unit
     )
 
-    suspend fun resetPinCode(
-        pinCode: String,
-        citizen: Citizen,
-        onResult: (Boolean, Citizen?, String?) -> Unit
-    )
+    suspend fun resetPinCode(pinCode: String) : Boolean
 
     suspend fun sendAvatar(avatar: ByteArray?): Boolean
     fun disconnectCard()
@@ -33,4 +29,5 @@ interface JavaCardRepository {
     suspend fun penalizeLicenseByIndex(points: Int, index: Int): Pair<Int, Boolean>?
     suspend fun getAllLicensesFromCard(): List<Triple<String, Int, Boolean>>?
     suspend fun resetLicenseByIndex(index: Int): Boolean
+    suspend fun resetPinByAdmin(puk: String, newPin: String): Boolean
 }

@@ -232,7 +232,7 @@ class JavaCardRepositoryImpl : JavaCardRepository {
         val citizen = citizen.copy(citizenId = newId)
         println("setupPinCode=====>" + bytesToHex(stringToHexArray(citizen.toCardInfo() + "$" + pinCode)))
         val formattedDate = SimpleDateFormat("dd/MM/yyyy").format(Date())
-        val data = stringToHexArray("${citizen.toCardInfo()}$${formattedDate}$${pinCode}")
+        val data = stringToHexArray("${citizen.toCardInfo()}${formattedDate}${pinCode}")
         when (val result = sendApdu(0x00, 0x01, 0x05, 0x00, data)) {
             is ApduResult.Success -> {
                 ApplicationState.setCardInserted(true)
@@ -252,31 +252,9 @@ class JavaCardRepositoryImpl : JavaCardRepository {
         }
     }
 
-    override suspend fun resetPinCode(
-        pinCode: String,
-        citizen: Citizen,
-        onResult: (Boolean, Citizen?, String?) -> Unit
-    ) {
-        println("resetPinCode=====>" + bytesToHex(stringToHexArray(citizen.toCardInfo() + "$" + pinCode)))
-        val formattedDate = SimpleDateFormat("dd/MM/yyyy").format(Date())
-        val data = stringToHexArray("${citizen.toCardInfo()}$${formattedDate}$${pinCode}")
-        when (val result = sendApdu(0x00, 0x01, 0x05, 0x00, data)) {
-            is ApduResult.Success -> {
-                ApplicationState.setCardInserted(true)
-                ApplicationState.setCardVerified(true)
-                val publicKey = bytesToHex(result.response)
-                println("resetPinCode=====>publicKey: $publicKey")
-                citizen.avatar?.let {
-                    sendAvatar(it)
-                }
-                onResult(true, citizen, publicKey)
-            }
-
-            is ApduResult.Failed -> {
-                println("setupPinCode=====>failed")
-                onResult(false, null, null)
-            }
-        }
+    override suspend fun resetPinCode(pinCode: String): Boolean = withContext(Dispatchers.IO) {
+        val defaultPuk = "12345678"
+        resetPinByAdmin(defaultPuk, pinCode)
     }
 
     override suspend fun sendAvatar(avatar: ByteArray?): Boolean {
@@ -346,7 +324,7 @@ class JavaCardRepositoryImpl : JavaCardRepository {
     }
 
     override suspend fun changePin(oldPin: String, newPin: String): Boolean = withContext(Dispatchers.IO) {
-        when (val result = sendApdu(0x00, 0x03, 0x04, 0x00, stringToHexArray("$oldPin$$newPin"))) {
+        when (val result = sendApdu(0x00, 0x03, 0x04, 0x00, stringToHexArray("$newPin"))) {
             is ApduResult.Success -> {
                 println("change pin success! ${bytesToHex(result.response)}")
                 true
@@ -433,46 +411,49 @@ class JavaCardRepositoryImpl : JavaCardRepository {
         }
     }
 
-    override suspend fun penalizeLicenseByIndex(points: Int, index: Int): Pair<Int, Boolean>? = withContext(Dispatchers.IO) {
-        // Log xem mình gửi cái gì đi
-        println("Sending Penalize: Points=$points, Index=$index")
+    override suspend fun penalizeLicenseByIndex(points: Int, index: Int): Pair<Int, Boolean>? =
+        withContext(Dispatchers.IO) {
+            // Log xem mình gửi cái gì đi
+            println("Sending Penalize: Points=$points, Index=$index")
 
-        // Gửi lệnh 0x22, P1 = Điểm, P2 = Index
-        when (val result = sendApdu(0x00, 0x22, points, index, null)) {
-            is ApduResult.Success -> {
-                val resp = result.response ?: return@withContext null
+            // Gửi lệnh 0x22, P1 = Điểm, P2 = Index
+            when (val result = sendApdu(0x00, 0x22, points, index, null)) {
+                is ApduResult.Success -> {
+                    val resp = result.response ?: return@withContext null
 
-                // --- LOG DEBUG QUAN TRỌNG ---
-                // Hãy xem logcat hiện gì.
-                // Nếu hiện "Response Hex: 00 01" nghĩa là 0 điểm, bị khóa.
-                // Nếu hiện "Response Hex: 0C 00" nghĩa là 12 điểm, mở.
-                val hexString = resp.joinToString(" ") { "%02X".format(it) }
-                println("Card Response Hex: $hexString")
-                // -----------------------------
+                    // --- LOG DEBUG QUAN TRỌNG ---
+                    // Hãy xem logcat hiện gì.
+                    // Nếu hiện "Response Hex: 00 01" nghĩa là 0 điểm, bị khóa.
+                    // Nếu hiện "Response Hex: 0C 00" nghĩa là 12 điểm, mở.
+                    val hexString = resp.joinToString(" ") { "%02X".format(it) }
+                    println("Card Response Hex: $hexString")
+                    // -----------------------------
 
-                // Trả về: [Score] [Status]
-                if (resp.size >= 2) {
-                    // SỬA LẠI: Dùng toInt() and 0xFF để đảm bảo lấy đúng số dương
-                    val score = resp[0].toInt() and 0xFF
-                    val statusByte = resp[1].toInt() and 0xFF
+                    // Trả về: [Score] [Status]
+                    if (resp.size >= 2) {
+                        // SỬA LẠI: Dùng toInt() and 0xFF để đảm bảo lấy đúng số dương
+                        val score = resp[0].toInt() and 0xFF
+                        val statusByte = resp[1].toInt() and 0xFF
 
-                    // Status: 1 là Khóa (Revoked), 0 là Mở
-                    val isRevoked = (statusByte == 1)
+                        // Status: 1 là Khóa (Revoked), 0 là Mở
+                        val isRevoked = (statusByte == 1)
 
-                    println("Parsed Result: Score=$score, isRevoked=$isRevoked")
+                        println("Parsed Result: Score=$score, isRevoked=$isRevoked")
 
-                    Pair(score, isRevoked)
-                } else {
-                    println("Error: Response length too short (<2 bytes)")
+                        Pair(score, isRevoked)
+                    } else {
+                        println("Error: Response length too short (<2 bytes)")
+                        null
+                    }
+                }
+
+                is ApduResult.Failed -> {
+                    println("Error: Send APDU Failed - ${result.message}")
                     null
                 }
             }
-            is ApduResult.Failed -> {
-                println("Error: Send APDU Failed - ${result.message}")
-                null
-            }
         }
-    }
+
     // 3. Lấy toàn bộ danh sách từ thẻ
     override suspend fun getAllLicensesFromCard(): List<Triple<String, Int, Boolean>>? = withContext(Dispatchers.IO) {
         // Gửi lệnh 0x21
@@ -530,6 +511,37 @@ class JavaCardRepositoryImpl : JavaCardRepository {
         when (val result = sendApdu(0x00, 0x23, 0x00, index, null)) {
             is ApduResult.Success -> true
             is ApduResult.Failed -> false
+        }
+    }
+
+    // --- THÊM HÀM NÀY ĐỂ HỖ TRỢ PUK ---
+    // Gửi lệnh 0x11: Reset PIN bằng PUK
+    // Data gửi đi: [PUK (8 ký tự)] + [NEW PIN (6 ký tự)] nối liền
+    override suspend fun resetPinByAdmin(puk: String, newPin: String): Boolean = withContext(Dispatchers.IO) {
+        // Kiểm tra độ dài trước khi gửi để tránh lỗi thẻ
+        if (puk.length != 8 || newPin.length != 6) {
+            println("Lỗi: PUK phải 8 ký tự, PIN phải 6 ký tự")
+            return@withContext false
+        }
+
+        // Nối chuỗi: "12345678" + "112233" -> "12345678112233"
+        // Vì trong Applet ta đọc liên tiếp: pukOffset rồi đến pinOffset = pukOffset + 8
+        val dataStr = puk + newPin
+        val dataBytes = stringToHexArray(dataStr)
+
+        println("Sending Admin Reset: PUK=$puk, NewPIN=$newPin")
+
+        // Gửi lệnh 0x11
+        when (val result = sendApdu(0x00, 0x11, 0x00, 0x00, dataBytes)) {
+            is ApduResult.Success -> {
+                println("Reset PIN by Admin success!")
+                true
+            }
+
+            is ApduResult.Failed -> {
+                println("Reset PIN by Admin failed: ${bytesToHex(result.response)}")
+                false
+            }
         }
     }
 }

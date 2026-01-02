@@ -150,20 +150,26 @@ class HomeViewModel(
         }
     }
 
-    fun resetPinCode(pinCode: String, citizen: Citizen) {
+    fun resetPinCode(pinCode: String) {
         viewModelHandlerScope.launch {
             println("resetPinCode11111: ")
-            cardRepository.resetPinCode(pinCode, citizen) { isSuccess, newCitizen, publicKey ->
-                println("resetPinCode: $isSuccess, $newCitizen, $publicKey")
-                if (isSuccess && newCitizen != null && publicKey != null) {
-                    updateCitizenLocal(newCitizen, publicKey, true)
-                } else {
-                    updateUiState {
-                        it.copy(
-                            isShowNoticeDialog = true,
-                            noticeMessage = "Thiết lập thông tin thất bại, vui lòng thử lại!"
-                        )
-                    }
+            val isSuccess = cardRepository.resetPinCode(pinCode)
+            if (isSuccess) {
+                updateUiState {
+                    it.copy(
+                        isShowNoticeDialog = true,
+                        isShowSetupPinDialog = false,
+                        isShowResetPinDialog = false,
+                        noticeMessage = "Reset PIN thành công! (Mặc định PUK: 12345678)"
+                    )
+                }
+                getCardInfo()
+            } else {
+                updateUiState {
+                    it.copy(
+                        isShowNoticeDialog = true,
+                        noticeMessage = "Reset PIN thất bại! Vui lòng kiểm tra PUK."
+                    )
                 }
             }
         }

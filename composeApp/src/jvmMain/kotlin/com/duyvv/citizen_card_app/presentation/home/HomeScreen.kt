@@ -261,7 +261,7 @@ fun MainScreen() {
                                 if (uiState.isShowSetupPinDialog) {
                                     viewModel.setupPinCode(newPin, it)
                                 } else if (uiState.isShowResetPinDialog) {
-                                    viewModel.resetPinCode(newPin, it)
+                                    viewModel.resetPinCode(newPin)
                                 }
                             }
                         }
